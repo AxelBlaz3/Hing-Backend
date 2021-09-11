@@ -1,0 +1,34 @@
+import os
+from flask import Flask
+from config import Config, StagingConfig, ProductionConfig
+from routes.user_routes import user_api
+from repository import mongo, bcrypt, mail, jwt_manager
+
+def create_app() -> Flask:
+    app = Flask(__name__)
+
+    # Setup Mongo URI
+    if os.environ.get('environment') == 'production':
+        app.config.from_object(ProductionConfig())
+    elif os.environ.get('environment') == 'staging':
+        app.config.from_object(StagingConfig())
+    else:
+        app.config.from_object(Config())
+
+        
+
+    # Register blueprints
+    app.register_blueprint(user_api)
+
+    # Init app 
+    mongo.init_app(app=app)    
+    mail.init_app(app=app)
+    bcrypt.init_app(app=app)
+    jwt_manager.init_app(app=app)
+
+    return app
+
+
+if __name__ == '__main__':
+    app = create_app()
+    app.run(host='0.0.0.0', debug=True)    
