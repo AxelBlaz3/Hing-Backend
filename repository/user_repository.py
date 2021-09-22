@@ -1,3 +1,5 @@
+from bson.objectid import ObjectId
+from pymongo.command_cursor import CommandCursor
 from constants import USERS_COLLECTION
 from models.response import Response
 from typing import Union
@@ -27,11 +29,10 @@ class UserRepository:
         except Exception:
             return Response(status_code=400, msg='Some error occured', status=False)
 
-    @classmethod
-    def signup(*args) -> Union[dict, Response]:
+    @staticmethod
+    def signup(signup_request) -> Union[dict, Response]:
         mongo.db[USERS_COLLECTION].create_index('email', unique=True)
 
-        _, signup_request = args
         signup_data = signup_request.dict()
         signup_data['image'] = None
 
@@ -48,3 +49,76 @@ class UserRepository:
         except Exception as e:
             print(e)
             return Response(status_code=400, msg='Some error occured', status=False)
+
+
+    @staticmethod
+    def get_followers(user_id) -> Union[CommandCursor, Response]:
+        try:
+            if user_id is None:
+                return Response(status=True, status_code=400, msg='Invalid user id')
+
+            followers = mongo.db[USERS_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        '_id': ObjectId(user_id)
+                    }
+                }, 
+                {
+                    '$project': {
+                        '_id': 0,
+                        'followers': 1
+                    }
+                }, 
+                {
+                    '$lookup': {
+                        'from': 'users',
+                        'localField': 'followers',
+                        'foreignField': '_id',
+                        'as': 'followers'
+                    }
+                },
+                {
+                    '$project': {
+                        'user.password': 0
+                    }
+                }
+            ])
+            return followers
+        except:
+            return []
+
+    @staticmethod
+    def get_following(user_id) -> Union[CommandCursor, Response]:
+        try:
+            if user_id is None:
+                return Response(status=True, status_code=400, msg='Invalid user id')
+
+            followers = mongo.db[USERS_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        '_id': ObjectId(user_id)
+                    }
+                }, 
+                {
+                    '$project': {
+                        '_id': 0,
+                        'following': 1
+                    }
+                }, 
+                {
+                    '$lookup': {
+                        'from': 'users',
+                        'localField': 'following',
+                        'foreignField': '_id',
+                        'as': 'followers'
+                    }
+                },
+                {
+                    '$project': {
+                        'user.password': 0
+                    }
+                }
+            ])
+            return followers
+        except:
+            return []                

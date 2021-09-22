@@ -2,6 +2,9 @@ import os
 from flask import Flask
 from config import Config, StagingConfig, ProductionConfig
 from routes.user_routes import user_api
+from routes.recipe_routes import recipe_api
+from routes.feed_routes import feed_api
+from routes.comment_routes import comments_api
 from repository import mongo, bcrypt, mail, jwt_manager
 
 def create_app() -> Flask:
@@ -19,6 +22,9 @@ def create_app() -> Flask:
 
     # Register blueprints
     app.register_blueprint(user_api)
+    app.register_blueprint(recipe_api)
+    app.register_blueprint(feed_api)
+    app.register_blueprint(comments_api)
 
     # Init app 
     mongo.init_app(app=app)    
@@ -31,4 +37,4 @@ def create_app() -> Flask:
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', debug=True)    
+    app.run(host='0.0.0.0', port=4999, debug=True)    
