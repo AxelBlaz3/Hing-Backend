@@ -4,3 +4,4 @@ class Response(BaseModel):
     status: bool
     msg: str
     status_code: int
+    image: str = None

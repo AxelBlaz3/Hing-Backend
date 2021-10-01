@@ -1,3 +1,5 @@
+from models.create_password_request import CreatePasswordRequest
+from models.edit_profile_request import EditProfileRequest
 from models.follow_request import FollowRequest
 from bson.objectid import ObjectId
 from pymongo.command_cursor import CommandCursor
@@ -6,7 +8,7 @@ from flask import json
 from bson import json_util
 from flask.json import jsonify
 from routes import user_api
-from constants import FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT
+from constants import CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT
 from models.signup_request import SignupRequest
 from models.login_request import LoginRequest
 from pydantic.error_wrappers import ValidationError
@@ -78,8 +80,9 @@ def get_followers(user_id):
     try:
         page = request.args.get('page', default=1, type=int)
         per_page = request.args.get('per_page', default=10, type=int)
+        other_user_id = request.args.get('other_user_id', default=None)
 
-        result = UserRepository.get_followers(user_id=user_id, page=page, per_page=per_page)
+        result = UserRepository.get_followers(user_id=user_id, other_user_id=other_user_id, page=page, per_page=per_page)
         if isinstance(result, list):
             return jsonify(json.loads(json_util.dumps(result)))
         else:
@@ -94,8 +97,9 @@ def get_following(user_id):
     try:
         page = request.args.get('page', default=1, type=int)
         per_page = request.args.get('per_page', default=10, type=int)
+        other_user_id = request.args.get('other_user_id', default=None)
 
-        result = UserRepository.get_following(user_id=user_id, page=page, per_page=per_page)
+        result = UserRepository.get_following(user_id=user_id, other_user_id=other_user_id, page=page, per_page=per_page)
         if isinstance(result, list):
             return jsonify(json.loads(json_util.dumps(result)))
         else:
@@ -110,8 +114,9 @@ def get_posts(user_id):
     try:
         page = request.args.get('page', default=1, type=int)
         per_page = request.args.get('per_page', default=10, type=int)
+        other_user_id = request.args.get('other_user_id', default=None, type=str)
 
-        result = UserRepository.get_posts(user_id=user_id, page=page, per_page=per_page)
+        result = UserRepository.get_posts(user_id=user_id, other_user_id=other_user_id, page=page, per_page=per_page)
         if isinstance(result, CommandCursor):
             return jsonify(json.loads(json_util.dumps(result)))
         else:
@@ -134,5 +139,53 @@ def get_favorites(user_id):
             return result.dict(), result.status_code
     except Exception as e:
         print(e)
-        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400      
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
 
+
+@user_api.get(GET_NOTIFICATIONS_ENDPOINT)
+def get_notifications(user_id):
+    try:
+        page = request.args.get('page', default=1, type=int)
+        per_page = request.args.get('per_page', default=10, type=int)
+
+        result = UserRepository.get_notifications(user_id=user_id, page=page, per_page=per_page)
+        if isinstance(result, CommandCursor):
+            return jsonify(json.loads(json_util.dumps(result)))
+        else:
+            return result.dict(), result.status_code
+    except Exception as e:
+        print(e)
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400              
+
+
+@user_api.put(EDIT_PROFILE_ENDPOINT)
+@validate()
+def edit_profile():
+    try:
+        edit_profile_request = EditProfileRequest(**request.form.to_dict(), **request.files)
+    except ValidationError as e:
+        return e.json(), 400
+
+    result = UserRepository.update_user(edit_profile_request=edit_profile_request, image=request.files.get('image'))
+    
+    return result.dict(), result.status_code
+
+@user_api.put(CREATE_NEW_PASSWORD_ENDPOINT)
+@validate()
+def create_new_password():
+    try:
+        create_password_request = CreatePasswordRequest(**request.json)
+    except ValidationError as e:
+        return e.json(), 400
+
+    result = UserRepository.create_new_password(create_password_request=create_password_request)
+    
+    return result.dict(), result.status_code   
+
+
+@user_api.post(SEND_RESET_CODE_ENDPOINT)
+def send_reset_code():
+    email = request.form.get('email', default=None)
+    result = UserRepository.send_verification_code(email=email)
+
+    return result.dict(), result.status_code

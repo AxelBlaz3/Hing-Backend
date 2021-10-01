@@ -3,7 +3,7 @@ import pymongo
 from models.response import Response
 from typing import Union
 from repository import mongo
-from constants import RECIPES_COLLECTION
+from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION
 
 
 class FeedRepository:
@@ -48,6 +48,14 @@ class FeedRepository:
                     }
                 },
                 {
+                    '$lookup': {
+                        'from': COMMENTS_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'recipe_id',
+                        'as': 'comments'
+                    }
+                },
+                {
                     '$project': {
                         'user': {
                             '$arrayElemAt': [
@@ -59,10 +67,14 @@ class FeedRepository:
                         'category': 1,
                         'media': 1,
                         'title': 1,
-                        'likes_count': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
                         'likes': 1,
                         'favorites': 1,
-                        'comments_count': 1
+                        'comments_count': {
+                            '$size': '$comments'
+                        }
                     }
                 },
                 {

@@ -19,6 +19,11 @@ class CommentsRepository:
         try:
             comments = mongo.db[COMMENTS_COLLECTION].aggregate([
                 {
+                    '$match': {
+                        'recipe_id': ObjectId(recipe_id)
+                    }
+                },
+                {
                     '$sort': {
                         'created_at': pymongo.DESCENDING
                     }
@@ -28,11 +33,6 @@ class CommentsRepository:
                 },
                 {
                     '$limit': per_page
-                },
-                {
-                    '$match': {
-                        'recipe_id': ObjectId(recipe_id)
-                    }
                 },
                 {
                     '$addFields': {
@@ -50,20 +50,33 @@ class CommentsRepository:
                     }
                 },
                 {
+                    '$lookup': {
+                        'from': REPLIES_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'comment_id',
+                        'as': 'replies'
+                    }
+                },
+                {
                     '$project': {
                         'user': {
                             '$arrayElemAt': ['$user', 0]
                         },
                         'body': 1,
                         'created_at': 1,
-                        'likes_count': 1,
-                        'replies_count': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
+                        'replies_count': {
+                            '$size': '$replies'
+                        },
                         'recipe_id': 1,
                         'is_liked': 1
                     }
                 },
                 {
                     '$project': {
+                        'replies': 0,
                         'user.followers': 0,
                         'user.password': 0,
                         'user.email': 0,
@@ -84,6 +97,11 @@ class CommentsRepository:
         try:
             comments = mongo.db[REPLIES_COLLECTION].aggregate([
                 {
+                    '$match': {
+                        'comment_id': ObjectId(comment_id)
+                    }
+                },
+                {
                     '$sort': {
                         'created_at': pymongo.DESCENDING
                     }
@@ -93,11 +111,6 @@ class CommentsRepository:
                 },
                 {
                     '$limit': per_page
-                },
-                {
-                    '$match': {
-                        'comment_id': ObjectId(comment_id)
-                    }
                 },
                 {
                     '$addFields': {
@@ -115,14 +128,26 @@ class CommentsRepository:
                     }
                 },
                 {
+                    '$lookup': {
+                        'from': REPLIES_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'comment_id',
+                        'as': 'replies'
+                    }
+                },
+                {
                     '$project': {
                         'user': {
                             '$arrayElemAt': ['$user', 0]
                         },
                         'body': 1,
                         'created_at': 1,
-                        'likes_count': 1,
-                        'replies_count': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
+                        'replies_count': {
+                            '$size': '$replies'
+                        },
                         'recipe_id': 1,
                         'is_liked': 1,
                         'comment_id': 1
@@ -130,6 +155,7 @@ class CommentsRepository:
                 },
                 {
                     '$project': {
+                        'replies': 0,
                         'user.followers': 0,
                         'user.password': 0,
                         'user.email': 0,
@@ -155,11 +181,96 @@ class CommentsRepository:
             comment_dict['recipe_id'] = recipe_id
             comment_dict['created_at'] = datetime.utcnow()
 
-            insert_result: InsertOneResult = mongo.db[COMMENTS_COLLECTION].insert_one(
+            del comment_dict['is_reply']
+
+            insert_result: InsertOneResult
+
+            insert_result = mongo.db[COMMENTS_COLLECTION].insert_one(
                 comment_dict)
-            mongo.db[RECIPES_COLLECTION].find_one_and_update(
-                filter={'_id': recipe_id}, update={'$inc': {'comments_count': 1}})
+
             comment = mongo.db[COMMENTS_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        '_id': insert_result.inserted_id
+                    }
+                },
+                {
+                    '$addFields': {
+                        'is_liked': {
+                            '$in': [user_id, '$likes']
+                        }
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': 'users',
+                        'localField': 'user_id',
+                        'foreignField': '_id',
+                        'as': 'user'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': REPLIES_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'comment_id',
+                        'as': 'replies'
+                    }
+                },
+                {
+                    '$project': {
+                        'user': {
+                            '$arrayElemAt': ['$user', 0]
+                        },
+                        'body': 1,
+                        'created_at': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
+                        'replies_count': {
+                            '$size': '$replies'
+                        },
+                        'recipe_id': 1,
+                        'is_liked': 1
+                    }
+                },
+                {
+                    '$project': {
+                        'replies': 0,
+                        'user.followers': 0,
+                        'user.password': 0,
+                        'user.email': 0,
+                        'user.favorites': 0,
+                        'user.likes': 0,
+                        'user.following': 0
+                    }
+                },
+            ])
+            return comment
+        except Exception as e:
+            print(e)
+
+    @staticmethod
+    def new_reply(reply_request: ReplyRequest) -> Response:
+        try:
+            user_id = ObjectId(reply_request.user_id)
+            comment_dict = reply_request.dict()
+            comment_dict['user_id'] = user_id
+            comment_dict['recipe_id'] = ObjectId(reply_request.recipe_id)
+            comment_dict['comment_id'] = ObjectId(reply_request.comment_id)
+            comment_dict['created_at'] = datetime.utcnow()
+            del comment_dict['is_reply']
+
+            insert_result: InsertOneResult = mongo.db[REPLIES_COLLECTION].insert_one(
+                comment_dict)
+
+            # if reply_request.is_reply:
+            #     mongo.db[REPLIES_COLLECTION].find_one_and_update(
+            #         filter={'_id': comment_dict['comment_id']}, update={'$inc': {'replies_count': 1}})
+            # else:
+            #     mongo.db[COMMENTS_COLLECTION].find_one_and_update(
+            #         filter={'_id': comment_dict['comment_id']}, update={'$inc': {'replies_count': 1}})
+            reply = mongo.db[REPLIES_COLLECTION].aggregate([
                 {
                     '$match': {
                         '_id': insert_result.inserted_id
@@ -189,7 +300,8 @@ class CommentsRepository:
                         'likes_count': 1,
                         'replies_count': 1,
                         'recipe_id': 1,
-                        'is_liked': 1
+                        'is_liked': 1,
+                        'comment_id': 1
                     }
                 },
                 {
@@ -202,44 +314,6 @@ class CommentsRepository:
                         'user.following': 0
                     }
                 },
-            ])
-            return comment
-        except Exception as e:
-            print(e)
-
-    @staticmethod
-    def new_reply(reply_request: ReplyRequest) -> Response:
-        try:
-            user_id = ObjectId(reply_request.user_id)
-            comment_dict = reply_request.dict()
-            comment_dict['user_id'] = user_id
-            comment_dict['recipe_id'] = ObjectId(reply_request.recipe_id)
-            comment_dict['comment_id'] = ObjectId(reply_request.comment_id)
-            comment_dict['created_at'] = datetime.utcnow()
-            del comment_dict['is_reply']
-
-            insert_result: InsertOneResult = mongo.db[REPLIES_COLLECTION].insert_one(
-                comment_dict)
-
-            if reply_request.is_reply:
-                mongo.db[REPLIES_COLLECTION].find_one_and_update(
-                    filter={'_id': comment_dict['comment_id']}, update={'$inc': {'replies_count': 1}})
-            else:
-                mongo.db[COMMENTS_COLLECTION].find_one_and_update(
-                    filter={'_id': comment_dict['comment_id']}, update={'$inc': {'replies_count': 1}})
-            reply = mongo.db[REPLIES_COLLECTION].aggregate([
-                {
-                    '$match': {
-                        '_id': insert_result.inserted_id
-                    }
-                },
-                {
-                    '$addFields': {
-                        'is_liked': {
-                            '$in': [user_id, '$likes']
-                        }
-                    }
-                }
             ])
             return reply
         except Exception as e:
