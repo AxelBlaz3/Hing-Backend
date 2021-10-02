@@ -1,0 +1,38 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+name: Hing Backend (Flask)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH and deploy python app
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd /srv/www/HingBackend
+            source /home/${{ secrets.SSH_USERNAME }}/.virtualenvs/hingEnv/bin/activate
+            git pull origin master
+            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+            supervisorctl restart hing

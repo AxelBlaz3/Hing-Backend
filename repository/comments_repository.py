@@ -8,8 +8,9 @@ from models.response import Response
 from models.reply_request import ReplyRequest
 from bson.objectid import ObjectId
 from repository import mongo
-from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION, REPLIES_COLLECTION
+from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, REPLIES_COLLECTION
 from datetime import datetime
+from extensions import NotificationType
 
 
 class CommentsRepository:
@@ -188,6 +189,17 @@ class CommentsRepository:
             insert_result = mongo.db[COMMENTS_COLLECTION].insert_one(
                 comment_dict)
 
+            recipe = mongo.db[RECIPES_COLLECTION].find_one_or_404({'_id': recipe_id}, {'user_id': 1, '_id': 0})    
+
+            notification: dict = {
+                        'created_at': datetime.utcnow(),
+                        'user_id': recipe['user_id'],
+                        'other_user_id': user_id,
+                        'recipe_id': recipe_id,
+                        'type': NotificationType.NEW_COMMENT
+                    }
+            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)    
+
             comment = mongo.db[COMMENTS_COLLECTION].aggregate([
                 {
                     '$match': {
@@ -264,12 +276,16 @@ class CommentsRepository:
             insert_result: InsertOneResult = mongo.db[REPLIES_COLLECTION].insert_one(
                 comment_dict)
 
-            # if reply_request.is_reply:
-            #     mongo.db[REPLIES_COLLECTION].find_one_and_update(
-            #         filter={'_id': comment_dict['comment_id']}, update={'$inc': {'replies_count': 1}})
-            # else:
-            #     mongo.db[COMMENTS_COLLECTION].find_one_and_update(
-            #         filter={'_id': comment_dict['comment_id']}, update={'$inc': {'replies_count': 1}})
+            comment = mongo.db[COMMENTS_COLLECTION].find_one_or_404({'_id': comment_dict['comment_id']}, {'user_id': 1, '_id': 0})        
+
+            notification: dict = {
+                        'created_at': datetime.utcnow(),
+                        'user_id': comment['user_id'],
+                        'other_user_id': user_id,
+                        'type': NotificationType.NEW_REPLY
+                    }
+            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)  
+
             reply = mongo.db[REPLIES_COLLECTION].aggregate([
                 {
                     '$match': {
@@ -326,25 +342,23 @@ class CommentsRepository:
             user_id = ObjectId(like_request.user_id)
             filter = {'_id': comment_id}
 
-            mongo.db[COMMENTS_COLLECTION].find_one(filter, {'_id': 1})
-            comment = mongo.db[COMMENTS_COLLECTION].find_one(
-                {'_id': comment_id, 'likes': user_id}, {'_id': 1})
+            updated_comment = mongo.db[COMMENTS_COLLECTION].find_one_and_update(
+                filter=filter, update={'$addToSet': {
+                    'likes': user_id
+                }}, return_document=ReturnDocument.AFTER)
 
-            if comment is None:
-                update = {
-                    '$addToSet': {
-                        'likes': user_id
-                    },
-                    '$inc': {
-                        'likes_count': 1
+            if not updated_comment:
+                return Response(status=False, msg='Comment not found', status_code=404)
+
+            notification: dict = {
+                        'created_at': datetime.utcnow(),
+                        'user_id': updated_comment['user_id'],
+                        'other_user_id': user_id,
+                        'comment_id': comment_id,
+                        'type': NotificationType.LIKE_COMMENT
                     }
-                }
-                updated_comment = mongo.db[COMMENTS_COLLECTION].find_one_and_update(
-                    filter=filter, update=update, return_document=ReturnDocument.AFTER)
-
-                if not updated_comment:
-                    return Response(status=False, msg='Comment not found', status_code=404)
-
+            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification) 
+            
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:
             print(e)
@@ -356,24 +370,24 @@ class CommentsRepository:
             user_id = ObjectId(like_request.user_id)
             filter = {'_id': ObjectId(like_request.reply_id)}
 
-            mongo.db[REPLIES_COLLECTION].find_one(filter, {'_id': 1})
-            reply = mongo.db[REPLIES_COLLECTION].find_one(
-                {'_id': reply_id, 'likes': user_id})
-
-            if not reply:
-                update = {
+            updated_reply = mongo.db[REPLIES_COLLECTION].find_one_and_update(
+                filter=filter, update={
                     '$addToSet': {
                         'likes': ObjectId(like_request.user_id)
-                    },
-                    '$inc': {
-                        'likes_count': 1
                     }
-                }
-                updated_reply = mongo.db[REPLIES_COLLECTION].find_one_and_update(
-                    filter=filter, update=update, return_document=ReturnDocument.AFTER)
+                }, return_document=ReturnDocument.AFTER)
 
-                if not updated_reply:
-                    return Response(status=False, msg='Comment not found', status_code=404)
+            if not updated_reply:
+                return Response(status=False, msg='Comment not found', status_code=404)
+
+            notification: dict = {
+                    'created_at': datetime.utcnow(),
+                    'user_id': updated_reply['user_id'],
+                    'other_user_id': user_id,
+                    'reply_id': reply_id,
+                    'type': NotificationType.LIKE_REPLY
+                }
+            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)     
 
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:
@@ -417,24 +431,15 @@ class CommentsRepository:
             user_id = ObjectId(like_request.user_id)
             filter = {'_id': reply_id}
 
-            mongo.db[REPLIES_COLLECTION].find_one(filter, {'_id': 1})
-            reply = mongo.db[REPLIES_COLLECTION].find_one(
-                {'_id': reply_id, 'likes': user_id})
-
-            if reply:
-                update = {
+            updated_reply = mongo.db[REPLIES_COLLECTION].find_one_and_update(
+                filter=filter, update={
                     '$pull': {
                         'likes': user_id
-                    },
-                    '$inc': {
-                        'likes_count': -1
                     }
-                }
-                updated_reply = mongo.db[REPLIES_COLLECTION].find_one_and_update(
-                    filter=filter, update=update, return_document=ReturnDocument.AFTER)
+                }, return_document=ReturnDocument.AFTER)
 
-                if not updated_reply:
-                    return Response(status=False, msg='Comment not found', status_code=404)
+            if not updated_reply:
+                return Response(status=False, msg='Comment not found', status_code=404)
 
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:

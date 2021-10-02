@@ -6,8 +6,8 @@ from pymongo.results import InsertOneResult
 from models.response import Response
 from typing import List
 from repository import uploads, mongo
-from constants import RECIPES_COLLECTION, MEDIA_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
-from extensions import MediaType
+from constants import NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
+from extensions import MediaType, NotificationType
 from flask import json
 from bson import ObjectId
 from datetime import datetime
@@ -75,6 +75,15 @@ class RecipeRepository:
                 if not updated_recipe:
                     return Response(status=False, msg='Recipe not found', status_code=404)
 
+                notification: dict = {
+                        'created_at': datetime.utcnow(),
+                        'user_id': ObjectId(updated_recipe['user_id']),
+                        'other_user_id': ObjectId(like_request.user_id),
+                        'recipe_id': updated_recipe['_id'],
+                        'type': NotificationType.LIKE_POST
+                    }
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)
+            
             return Response(status=True, msg='Likes updated', status_code=200)
         except NotFound:
             return Response(status=False, msg='Recipe not found', status_code=404)    

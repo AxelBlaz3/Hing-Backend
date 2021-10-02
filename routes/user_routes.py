@@ -185,7 +185,8 @@ def create_new_password():
 
 @user_api.post(SEND_RESET_CODE_ENDPOINT)
 def send_reset_code():
-    email = request.form.get('email', default=None)
+    payload = request.json
+    email = payload['email'] if 'email' in payload else None
     result = UserRepository.send_verification_code(email=email)
 
     return result.dict(), result.status_code

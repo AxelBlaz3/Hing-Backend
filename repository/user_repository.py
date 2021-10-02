@@ -14,7 +14,7 @@ from models.follow_request import FollowRequest
 from bson.objectid import ObjectId
 import pymongo
 from pymongo.command_cursor import CommandCursor
-from constants import NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, USERS_COLLECTION
+from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
 from models.response import Response
 from typing import Union
 from repository import mongo, bcrypt
@@ -67,7 +67,6 @@ class UserRepository:
             print(e)
             return Response(status_code=400, msg='Some error occured', status=False)
 
-
     @staticmethod
     def send_verification_code(email: str) -> Response:
         try:
@@ -83,43 +82,44 @@ class UserRepository:
 
             try:
                 user = mongo.db[USERS_COLLECTION].find_one(filter=filter)
-                mongo.db[USERS_COLLECTION].update_one(filter=filter, update=update)
+                mongo.db[USERS_COLLECTION].update_one(
+                    filter=filter, update=update)
             except NotFound:
                 return Response(status_code=404, msg='No account is associated with that email', status=False)
 
-            message = Message(subject='Reset your password', recipients=[email], sender=current_app.config['MAIL_USERNAME'], html=render_template('reset_password.html', name=user['display_name'], code=code))
+            message = Message(subject='Reset your password', recipients=[email], sender=current_app.config['MAIL_USERNAME'], html=render_template(
+                'reset_password.html', name=user['display_name'], code=code))
             mail.send(message)
             return Response(status_code=200, msg='Mail sent', status=True)
         except Exception as e:
             print(f'{type(e)}: {e}')
-            return Response(status_code=400, msg='Some error occured', status=False)      
-
+            return Response(status_code=400, msg='Some error occured', status=False)
 
     @staticmethod
     def create_new_password(create_password_request: CreatePasswordRequest):
         try:
             filter = {'email': create_password_request.email}
             user = mongo.db[USERS_COLLECTION].find_one_or_404(filter=filter)
-            
+
             if not bcrypt.check_password_hash(pw_hash=user['code'], password=create_password_request.code):
                 return Response(status_code=403, msg='Invalid code', status=False)
 
             update_result: UpdateResult = mongo.db[USERS_COLLECTION].update_one(filter=filter, update={'$set': {
                 'password': bcrypt.generate_password_hash(password=create_password_request.password)
             },
-            '$unset': {
+                '$unset': {
                 'code': ''
             }})
 
             if update_result.modified_count > 0:
                 return Response(status_code=200, msg='Password updated', status=True)
 
-            return Response(status_code=400, msg='Something went wrong', status=False)    
+            return Response(status_code=400, msg='Something went wrong', status=False)
 
         except NotFound:
             return Response(status_code=404, msg='No account is associated with that email', status=False)
         except:
-            return Response(status_code=400, msg='Something went wrong', status=False)    
+            return Response(status_code=400, msg='Something went wrong', status=False)
 
     @staticmethod
     def get_followers(user_id, other_user_id, page=1, per_page=10) -> Union[CommandCursor, Response]:
@@ -128,7 +128,7 @@ class UserRepository:
                 return Response(status=True, status_code=400, msg='Invalid user id')
 
             if other_user_id is None:
-                return Response(status=True, status_code=400, msg='Invalid other user id')    
+                return Response(status=True, status_code=400, msg='Invalid other user id')
 
             user_id = ObjectId(user_id)
             other_user_id = ObjectId(other_user_id)
@@ -199,9 +199,9 @@ class UserRepository:
                 return Response(status=True, status_code=400, msg='Invalid user id')
 
             if other_user_id is None:
-                return Response(status=True, status_code=400, msg='Invalid other user id')    
+                return Response(status=True, status_code=400, msg='Invalid other user id')
 
-            user_id = ObjectId(user_id)    
+            user_id = ObjectId(user_id)
             other_user_id = ObjectId(other_user_id)
 
             following: CommandCursor = mongo.db[USERS_COLLECTION].aggregate([
@@ -453,7 +453,7 @@ class UserRepository:
             follower_id = ObjectId(follow_request.follower_id)
 
             update_result = mongo.db[USERS_COLLECTION].update_one(filter={'_id': followee_id}, update={
-                                                  '$addToSet': {'followers': follower_id}})
+                '$addToSet': {'followers': follower_id}})
             mongo.db[USERS_COLLECTION].update_one(filter={'_id': follower_id}, update={
                                                   '$addToSet': {'following': followee_id}})
 
@@ -467,10 +467,10 @@ class UserRepository:
                     'other_user_id': follower_id,
                     'type': NotificationType.NEW_FOLLOWER
                 }
-                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)
-                
-                # PushNotification.send_notification()
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(
+                    document=notification)
 
+                # PushNotification.send_notification()
 
             return Response(status=True, msg='Followers updated', status_code=200)
         except:
@@ -495,11 +495,10 @@ class UserRepository:
 
         return Response(status=False, msg='Something went wrong', status_code=400)
 
-
     @staticmethod
     def get_notifications(user_id: str, page: int = 1, per_page: int = 10):
         try:
-            if not user_id:    
+            if not user_id:
                 return Response(status=False, msg='Invalid user id', status_code=400)
 
             user_id = ObjectId(user_id)
@@ -511,6 +510,11 @@ class UserRepository:
                             '$eq': ['$user_id', user_id]
                         }
                     },
+                },
+                {
+                    '$sort': {
+                        'created_at': pymongo.DESCENDING
+                    }
                 },
                 {
                     '$skip': 0 if page <= 1 else per_page * (page - 1)
@@ -527,11 +531,44 @@ class UserRepository:
                     }
                 },
                 {
+                    '$lookup': {
+                        'from': RECIPES_COLLECTION,
+                        'as': 'recipes',
+                        'localField': 'recipe_id',
+                        'foreignField': '_id'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': COMMENTS_COLLECTION,
+                        'as': 'comments',
+                        'localField': 'comment_id',
+                        'foreignField': '_id'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': REPLIES_COLLECTION,
+                        'as': 'replies',
+                        'localField': 'reply_id',
+                        'foreignField': '_id'
+                    }
+                },
+                {
                     '$project': {
                         'created_at': 1,
                         'type': 1,
                         'other_user': {
                             '$arrayElemAt': ['$users', 0]
+                        },
+                        'recipe': {
+                            '$cond': [{'$anyElementTrue': ['$recipes']}, {'$arrayElemAt': ['$recipes', 0]}, None]
+                        },
+                        'comment': {
+                            '$cond': [{'$anyElementTrue': ['$comments']}, {'$arrayElemAt': ['$comments', 0]}, None]
+                        },
+                        'reply': {
+                            '$cond': [{'$anyElementTrue': ['$replies']}, {'$arrayElemAt': ['$replies', 0]}, None]
                         }
                     }
                 },
@@ -542,15 +579,17 @@ class UserRepository:
                         'other_user.display_name': 1,
                         'other_user.image': 1,
                         'created_at': 1,
-                        'type': 1
+                        'type': 1,
+                        'recipe.title': 1,
+                        'comment.body': 1,
+                        'reply.body': 1
                     }
                 }
-            ])  
+            ])
 
-            return notifications  
+            return notifications
         except Exception as e:
-            print(e)       
-
+            print(e)
 
     @staticmethod
     def update_user(edit_profile_request: EditProfileRequest, image: FileStorage = None):
@@ -563,14 +602,14 @@ class UserRepository:
             if image:
                 # Check if user has old image. If so, remove it.
                 if user['image']:
-                    old_image = os.path.join(current_app.config['UPLOAD_FOLDER'], 'users', edit_profile_request.user_id, user['image'])
+                    old_image = os.path.join(
+                        current_app.config['UPLOAD_FOLDER'], 'users', edit_profile_request.user_id, user['image'])
                     if os.path.exists(old_image):
                         os.remove(old_image)
 
                 # Save the new uploaded file path
-                image_path = upload_file(current_app.config['UPLOAD_FOLDER'], upload_type='users', _id=edit_profile_request.user_id, file=edit_profile_request.image)
-
-
+                image_path = upload_file(current_app.config['UPLOAD_FOLDER'], upload_type='users',
+                                         _id=edit_profile_request.user_id, file=edit_profile_request.image)
 
             update_dict = {
                 '$set': {
@@ -579,11 +618,12 @@ class UserRepository:
                     'image': image_path
                 }
             }
-            mongo.db[USERS_COLLECTION].find_one_and_update(filter=filter, update=update_dict)
+            mongo.db[USERS_COLLECTION].find_one_and_update(
+                filter=filter, update=update_dict)
             return Response(status=True, msg='Profile updated successfully', status_code=200, image=image_path)
 
         except NotFound:
             return Response(status=False, msg='User not found', status_code=404)
         except Exception as e:
             print(e)
-            return Response(status=False, msg='Something went wrong', status_code=400)    
+            return Response(status=False, msg='Something went wrong', status_code=400)
