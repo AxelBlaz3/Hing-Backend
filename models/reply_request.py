@@ -8,5 +8,5 @@ class ReplyRequest(BaseModel):
     likes: list = []
     likes_count: int = 0
     replies_count: int = 0
-    is_reply: bool = False
+    is_comment_reply: bool = True
     

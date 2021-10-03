@@ -11,6 +11,8 @@ from repository import mongo
 from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, REPLIES_COLLECTION
 from datetime import datetime
 from extensions import NotificationType
+from werkzeug.exceptions import NotFound
+import traceback
 
 
 class CommentsRepository:
@@ -271,12 +273,12 @@ class CommentsRepository:
             comment_dict['recipe_id'] = ObjectId(reply_request.recipe_id)
             comment_dict['comment_id'] = ObjectId(reply_request.comment_id)
             comment_dict['created_at'] = datetime.utcnow()
-            del comment_dict['is_reply']
+            del comment_dict['is_comment_reply']
 
             insert_result: InsertOneResult = mongo.db[REPLIES_COLLECTION].insert_one(
                 comment_dict)
 
-            comment = mongo.db[COMMENTS_COLLECTION].find_one_or_404({'_id': comment_dict['comment_id']}, {'user_id': 1, '_id': 0})        
+            comment = mongo.db[REPLIES_COLLECTION].find_one_or_404({'_id': comment_dict['comment_id']}, {'user_id': 1, '_id': 0})        
 
             notification: dict = {
                         'created_at': datetime.utcnow(),
@@ -332,8 +334,12 @@ class CommentsRepository:
                 },
             ])
             return reply
+        except NotFound as e:
+            traceback.print_exc()
+            return Response(status=False, msg='Comment not found', status_code=404)
         except Exception as e:
             print(e)
+            return Response(status=False, msg='Something went wrong', status_code=400)
 
     @staticmethod
     def like_comment(like_request: CommentLikeRequest) -> Response:
