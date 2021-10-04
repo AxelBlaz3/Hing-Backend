@@ -97,6 +97,40 @@ class FeedRepository:
                     }
                 },
                 {
+                    '$addFields': {
+                        'user.followers_count': {
+                            '$size': '$user.followers'
+                        }
+                    }
+                },
+                {
+                    '$addFields': {
+                        'user.following_count': {
+                            '$size': '$user.following'
+                        }
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': RECIPES_COLLECTION,
+                        'as': 'posts',
+                        'localField': 'user._id',
+                        'foreignField': 'user_id'
+                    }
+                },
+                {
+                    '$addFields': {
+                        'user.posts_count': {
+                            '$size': '$posts'
+                        }
+                    }
+                },
+                {
+                    '$project': {
+                        'posts': 0
+                    }
+                },
+                {
                     '$project': {
                         'user.password': 0,
                         'likes': 0

@@ -57,24 +57,20 @@ class RecipeRepository:
             recipe_id = ObjectId(like_request.recipe_id)
             user_id = ObjectId(like_request.user_id)
             filter = {'_id': recipe_id}
-            mongo.db[RECIPES_COLLECTION].find_one_or_404(filter, {'_id': 1})
-            recipe_likes = mongo.db[RECIPES_COLLECTION].find_one({'_id': recipe_id, 'likes': user_id}, {'_id': 1})
 
-            if recipe_likes is None:
-                update = {
-                            '$addToSet': {
-                                'likes': user_id
-                            },
-                            '$inc': { 
-                                'likes_count': 1
-                            }
+            update = {
+                        '$addToSet': {
+                            'likes': user_id
                         }
-                updated_recipe = mongo.db[RECIPES_COLLECTION].find_one_and_update(
-                    filter=filter, update=update, return_document=ReturnDocument.AFTER)
+                    }
+            updated_recipe = mongo.db[RECIPES_COLLECTION].find_one_and_update(
+                filter=filter, update=update, return_document=ReturnDocument.AFTER)
 
-                if not updated_recipe:
-                    return Response(status=False, msg='Recipe not found', status_code=404)
+            if not updated_recipe:
+                return Response(status=False, msg='Recipe not found', status_code=404)
 
+
+            if user_id != updated_recipe['user_id']:
                 notification: dict = {
                         'created_at': datetime.utcnow(),
                         'user_id': ObjectId(updated_recipe['user_id']),

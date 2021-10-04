@@ -193,14 +193,15 @@ class CommentsRepository:
 
             recipe = mongo.db[RECIPES_COLLECTION].find_one_or_404({'_id': recipe_id}, {'user_id': 1, '_id': 0})    
 
-            notification: dict = {
-                        'created_at': datetime.utcnow(),
-                        'user_id': recipe['user_id'],
-                        'other_user_id': user_id,
-                        'recipe_id': recipe_id,
-                        'type': NotificationType.NEW_COMMENT
-                    }
-            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)    
+            if user_id != recipe['user_id']:
+                notification: dict = {
+                            'created_at': datetime.utcnow(),
+                            'user_id': recipe['user_id'],
+                            'other_user_id': user_id,
+                            'recipe_id': recipe_id,
+                            'type': NotificationType.NEW_COMMENT
+                        }
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)    
 
             comment = mongo.db[COMMENTS_COLLECTION].aggregate([
                 {
@@ -278,15 +279,17 @@ class CommentsRepository:
             insert_result: InsertOneResult = mongo.db[REPLIES_COLLECTION].insert_one(
                 comment_dict)
 
-            comment = mongo.db[REPLIES_COLLECTION].find_one_or_404({'_id': comment_dict['comment_id']}, {'user_id': 1, '_id': 0})        
+            print(comment_dict['comment_id'])
+            comment = mongo.db[COMMENTS_COLLECTION if reply_request.is_comment_reply else REPLIES_COLLECTION].find_one_or_404({'_id': comment_dict['comment_id']}, {'user_id': 1, '_id': 0})        
 
-            notification: dict = {
-                        'created_at': datetime.utcnow(),
-                        'user_id': comment['user_id'],
-                        'other_user_id': user_id,
-                        'type': NotificationType.NEW_REPLY
-                    }
-            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)  
+            if user_id != comment['user_id']:
+                notification: dict = {
+                            'created_at': datetime.utcnow(),
+                            'user_id': comment['user_id'],
+                            'other_user_id': user_id,
+                            'type': NotificationType.NEW_REPLY
+                        }
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)  
 
             reply = mongo.db[REPLIES_COLLECTION].aggregate([
                 {
@@ -356,14 +359,15 @@ class CommentsRepository:
             if not updated_comment:
                 return Response(status=False, msg='Comment not found', status_code=404)
 
-            notification: dict = {
-                        'created_at': datetime.utcnow(),
-                        'user_id': updated_comment['user_id'],
-                        'other_user_id': user_id,
-                        'comment_id': comment_id,
-                        'type': NotificationType.LIKE_COMMENT
-                    }
-            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification) 
+            if user_id != updated_comment['user_id']:
+                notification: dict = {
+                            'created_at': datetime.utcnow(),
+                            'user_id': updated_comment['user_id'],
+                            'other_user_id': user_id,
+                            'comment_id': comment_id,
+                            'type': NotificationType.LIKE_COMMENT
+                        }
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification) 
             
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:
@@ -386,14 +390,15 @@ class CommentsRepository:
             if not updated_reply:
                 return Response(status=False, msg='Comment not found', status_code=404)
 
-            notification: dict = {
-                    'created_at': datetime.utcnow(),
-                    'user_id': updated_reply['user_id'],
-                    'other_user_id': user_id,
-                    'reply_id': reply_id,
-                    'type': NotificationType.LIKE_REPLY
-                }
-            mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)     
+            if user_id != updated_reply['user_id']:
+                notification: dict = {
+                        'created_at': datetime.utcnow(),
+                        'user_id': updated_reply['user_id'],
+                        'other_user_id': user_id,
+                        'reply_id': reply_id,
+                        'type': NotificationType.LIKE_REPLY
+                    }
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)     
 
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:

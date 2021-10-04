@@ -32,13 +32,61 @@ class UserRepository:
         filter = {'email': login_request.email}
         try:
             user = mongo.db[USERS_COLLECTION].find_one_or_404(
-                filter)
+                filter, {'password': 1, '_id': 1})
             if user:
                 if bcrypt.check_password_hash(user['password'], login_request.password):
                     del user['password']
                     user['access_token'] = create_access_token(
                         identity=str(user['_id']))
-                    return user
+
+                    user = mongo.db[USERS_COLLECTION].aggregate([
+                        {
+                            '$match': {
+                                '_id': user['_id']
+                            }
+                        },
+                        {
+                            '$addFields': {
+                                'followers_count': {
+                                    '$size': '$followers'
+                                }
+                            }
+                        },
+                        {
+                            '$addFields': {
+                                'following_count': {
+                                    '$size': '$following'
+                                }
+                            }
+                        },
+                        {
+                            '$project': {
+                                'password': 0,
+                                'following': 0
+                            }
+                        },
+                        {
+                            '$lookup': {
+                                'from': RECIPES_COLLECTION,
+                                'as': 'posts',
+                                'localField': '_id',
+                                'foreignField': 'user_id'
+                            }
+                        },
+                        {
+                            '$addFields': {
+                                'posts_count': {
+                                    '$size': '$posts'
+                                }
+                            }
+                        },
+                        {
+                            '$project': {
+                                'posts': 0
+                            }
+                        }
+                    ])
+                    return user.next()
                 else:
                     return Response(status_code=403, msg='Incorrect password', status=False)
         except NotFound:
