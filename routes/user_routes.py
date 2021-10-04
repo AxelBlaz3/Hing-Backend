@@ -8,7 +8,7 @@ from flask import json
 from bson import json_util
 from flask.json import jsonify
 from routes import user_api
-from constants import CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT
+from constants import CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT
 from models.signup_request import SignupRequest
 from models.login_request import LoginRequest
 from pydantic.error_wrappers import ValidationError
@@ -169,6 +169,14 @@ def edit_profile():
     result = UserRepository.update_user(edit_profile_request=edit_profile_request, image=request.files.get('image'))
     
     return result.dict(), result.status_code
+
+
+@user_api.put(UPDATE_FIREBASE_TOKEN_ENDPOINT)
+def update_firebase_token():
+    payload = request.json
+    result = UserRepository.update_firebase_token(payload=payload)
+    return result.dict(), result.status_code
+
 
 @user_api.put(CREATE_NEW_PASSWORD_ENDPOINT)
 @validate()

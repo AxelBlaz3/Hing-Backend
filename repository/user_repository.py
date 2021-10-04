@@ -1,6 +1,7 @@
 import os
 from random import Random, random
 from flask_mail import Message
+from pymongo.collection import ReturnDocument
 
 from pymongo.message import update
 from pymongo.results import UpdateResult
@@ -23,6 +24,7 @@ from pymongo.errors import DuplicateKeyError
 from flask import current_app, render_template
 from flask_jwt_extended import create_access_token
 from repository import mail
+from common.push_notification import PushNotification
 
 
 class UserRepository:
@@ -518,7 +520,11 @@ class UserRepository:
                 mongo.db[NOTIFICATIONS_COLLECTION].insert_one(
                     document=notification)
 
-                # PushNotification.send_notification()
+                user = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': followee_id}, {'firebase_token': 1})
+                user_who_followed = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': follower_id}, {'display_name': 1})
+
+                if 'firebase_token' in user and user['firebase_token']:
+                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_followed['display_name'], 'type': f'{NotificationType.NEW_FOLLOWER}'})
 
             return Response(status=True, msg='Followers updated', status_code=200)
         except:
@@ -674,4 +680,22 @@ class UserRepository:
             return Response(status=False, msg='User not found', status_code=404)
         except Exception as e:
             print(e)
+            return Response(status=False, msg='Something went wrong', status_code=400)
+
+    @staticmethod
+    def update_firebase_token(payload):
+        try:
+            if 'firebase_token' not in payload or not payload['firebase_token']:
+                return Response(status=False, msg='Invalid token', status_code=400)
+
+            if 'user_id' not in payload or not payload['user_id']:
+                return Response(status=False, msg='Invalid user id', status_code=400)
+
+            user = mongo.db[USERS_COLLECTION].find_one_and_update(filter={'_id': ObjectId(payload['user_id'])}, update={'$set': {'firebase_token': payload['firebase_token']}}, return_document=ReturnDocument.AFTER, upsert=True)
+
+            if not user:
+                return Response(status=False, msg='No user found', status_code=404)
+            
+            return Response(status=True, msg='Token updated', status_code=200)
+        except:           
             return Response(status=False, msg='Something went wrong', status_code=400)
