@@ -374,7 +374,9 @@ class UserRepository:
                         'category': 1,
                         'media': 1,
                         'title': 1,
-                        'likes_count': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
                         'likes': 1,
                         'favorites': 1,
                         'comments_count': {
