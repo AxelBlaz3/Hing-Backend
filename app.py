@@ -7,6 +7,7 @@ from routes.feed_routes import feed_api
 from routes.comment_routes import comments_api
 from repository import mongo, bcrypt, mail, jwt_manager
 import firebase_admin
+from gevent.pywsgi import WSGIServer
 
 def create_app() -> Flask:
     app = Flask(__name__)
@@ -40,4 +41,8 @@ if __name__ == '__main__':
 
     firebase_admin.initialize_app()
 
-    app.run(host='0.0.0.0', port=4999, debug=True)    
+    if os.environ.get('environment') == 'production' or os.environ.get('environment') == 'staging':
+        http_server = WSGIServer(('127.0.0.1', 5050), app)
+        http_server.serve_forever()
+    else:
+        app.run(host='0.0.0.0', port=5050)  
