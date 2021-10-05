@@ -300,7 +300,7 @@ class CommentsRepository:
                 user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.NEW_REPLY}', 'comment': comment['body']})
+                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.NEW_REPLY}', 'comment': reply_request.body})
 
             reply = mongo.db[REPLIES_COLLECTION].aggregate([
                 {
