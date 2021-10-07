@@ -199,6 +199,7 @@ class CommentsRepository:
                             'user_id': recipe['user_id'],
                             'other_user_id': user_id,
                             'recipe_id': recipe_id,
+                            'comment_id': insert_result.inserted_id,
                             'type': NotificationType.NEW_COMMENT
                         }
                 mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)    
@@ -292,6 +293,7 @@ class CommentsRepository:
                             'created_at': datetime.utcnow(),
                             'user_id': comment['user_id'],
                             'other_user_id': user_id,
+                            'reply_id': insert_result.inserted_id,
                             'type': NotificationType.NEW_REPLY
                         }
                 mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)  
@@ -376,6 +378,7 @@ class CommentsRepository:
                             'user_id': updated_comment['user_id'],
                             'other_user_id': user_id,
                             'comment_id': comment_id,
+                            'recipe_id': updated_comment['recipe_id'],
                             'type': NotificationType.LIKE_COMMENT
                         }
                 mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification) 
@@ -413,6 +416,7 @@ class CommentsRepository:
                         'user_id': updated_reply['user_id'],
                         'other_user_id': user_id,
                         'reply_id': reply_id,
+                        'recipe_id': updated_reply['recipe_id'],
                         'type': NotificationType.LIKE_REPLY
                     }
                 mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)     

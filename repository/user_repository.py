@@ -647,7 +647,11 @@ class UserRepository:
                         'created_at': 1,
                         'type': 1,
                         'recipe.title': 1,
+                        'recipe._id': 1,
+                        'comment._id': 1,
                         'comment.body': 1,
+                        'reply._id': 1,
+                        'reply.comment_id': 1,
                         'reply.body': 1
                     }
                 }
