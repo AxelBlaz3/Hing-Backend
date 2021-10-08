@@ -24,7 +24,7 @@ from pymongo.errors import DuplicateKeyError
 from flask import current_app, render_template
 from flask_jwt_extended import create_access_token
 from repository import mail
-from common.push_notification import PushNotification
+from common.firebase_utils import FirebaseUtils
 
 
 class UserRepository:
@@ -520,6 +520,9 @@ class UserRepository:
                                                   '$addToSet': {'following': followee_id}})
 
             if update_result.modified_count > 0:
+                # Subscribe the new follower to the followee's topic.
+                FirebaseUtils
+
                 # Send push notification to user for new follower.
                 # Insert the notification in 'notifications' collection.
 
@@ -536,7 +539,7 @@ class UserRepository:
                 user_who_followed = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': follower_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_followed['display_name'], 'type': f'{NotificationType.NEW_FOLLOWER}'})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_followed['display_name'], 'type': f'{NotificationType.NEW_FOLLOWER}'})
 
             return Response(status=True, msg='Followers updated', status_code=200)
         except:

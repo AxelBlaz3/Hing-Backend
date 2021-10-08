@@ -11,7 +11,7 @@ from extensions import MediaType, NotificationType
 from flask import json
 from bson import ObjectId
 from datetime import datetime
-from common.push_notification import PushNotification
+from common.push_notification import FirebaseUtils
 
 
 class RecipeRepository:
@@ -85,7 +85,7 @@ class RecipeRepository:
                 user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_POST}', 'recipe': updated_recipe['title']})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_POST}', 'recipe': updated_recipe['title']})
             
             return Response(status=True, msg='Likes updated', status_code=200)
         except NotFound:

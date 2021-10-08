@@ -13,7 +13,7 @@ from datetime import datetime
 from extensions import NotificationType
 from werkzeug.exceptions import NotFound
 import traceback
-from common.push_notification import PushNotification
+from common.firebase_utils import FirebaseUtils
 
 class CommentsRepository:
 
@@ -208,7 +208,7 @@ class CommentsRepository:
                 user_who_commented = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_commented['display_name'], 'type': f'{NotificationType.NEW_COMMENT}', 'comment': comment_request.body})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_commented['display_name'], 'type': f'{NotificationType.NEW_COMMENT}', 'comment': comment_request.body})
 
             comment = mongo.db[COMMENTS_COLLECTION].aggregate([
                 {
@@ -304,7 +304,7 @@ class CommentsRepository:
                 user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.NEW_REPLY}', 'comment': reply_request.body})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.NEW_REPLY}', 'comment': reply_request.body})
 
             reply = mongo.db[REPLIES_COLLECTION].aggregate([
                 {
@@ -389,7 +389,7 @@ class CommentsRepository:
                 user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_COMMENT}', 'comment': updated_comment['body']})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_COMMENT}', 'comment': updated_comment['body']})
             
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:
@@ -427,7 +427,7 @@ class CommentsRepository:
                 user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_REPLY}', 'reply': updated_reply['body']})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_REPLY}', 'reply': updated_reply['body']})
 
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:
