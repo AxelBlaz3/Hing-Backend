@@ -425,7 +425,7 @@ class CommentsRepository:
                 user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_REPLY}', 'comment': updated_reply['body']})
+                    PushNotification.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_REPLY}', 'reply': updated_reply['body']})
 
             return Response(status=True, msg='Likes updated', status_code=200)
         except Exception as e:
