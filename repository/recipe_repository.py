@@ -11,7 +11,7 @@ from extensions import MediaType, NotificationType
 from flask import json
 from bson import ObjectId
 from datetime import datetime
-from common.push_notification import FirebaseUtils
+from common.firebase_utils import FirebaseUtils
 
 
 class RecipeRepository:
