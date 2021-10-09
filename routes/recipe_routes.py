@@ -2,7 +2,7 @@ from models.like_request import LikeRequest
 from models.recipe_request import RecipeRequest
 from repository.recipe_repository import RecipeRepository
 from routes import recipe_api
-from constants import ADD_TO_FAVORITES_ENDPOINT, LIKE_RECIPE_ENDPOINT, NEW_RECIPE_ENDPOINT, REMOVE_FROM_FAVORITES_ENDPOINT, UNLIKE_RECIPE_ENDPOINT
+from constants import ADD_TO_FAVORITES_ENDPOINT, GET_RECIPE_ENDPOINT, LIKE_RECIPE_ENDPOINT, NEW_RECIPE_ENDPOINT, REMOVE_FROM_FAVORITES_ENDPOINT, UNLIKE_RECIPE_ENDPOINT
 from pydantic.error_wrappers import ValidationError
 from models.response import Response
 from flask import jsonify, request, json, current_app
@@ -22,6 +22,21 @@ def new_recipe():
     except Exception as e:
         print(e)
         return Response(status=False, msg='Some error occured', status_code=400).dict(), 400    
+
+
+@recipe_api.get(GET_RECIPE_ENDPOINT)
+def get_recipe():
+    try:
+        recipe_id = request.args.get('recipe_id')
+        user_id = request.args.get('user_id')
+        recipe = RecipeRepository.get_recipe(user_id=user_id, recipe_id=recipe_id)        
+
+        if not recipe:
+            return {}
+
+        return jsonify(json.loads(json_util.dumps(recipe.next())))    
+    except:  
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400     
 
 @recipe_api.put(LIKE_RECIPE_ENDPOINT)
 def like_recipe():

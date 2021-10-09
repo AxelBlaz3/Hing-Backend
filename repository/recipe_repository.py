@@ -6,7 +6,7 @@ from pymongo.results import InsertOneResult
 from models.response import Response
 from typing import List
 from repository import uploads, mongo
-from constants import NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
+from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
 from extensions import MediaType, NotificationType
 from flask import json
 from bson import ObjectId
@@ -29,7 +29,7 @@ class RecipeRepository:
             recipe_dict = recipe_request.dict()
             recipe_dict['created_at'] = datetime.utcnow()
             insert_result: InsertOneResult = mongo.db[RECIPES_COLLECTION].insert_one(recipe_dict
-            )
+                                                                                     )
 
             # Upload media
             media: List[str] = []
@@ -47,6 +47,15 @@ class RecipeRepository:
                 })
 
             mongo.db[MEDIA_COLLECTION].insert_many(media)
+
+            # notification: dict = {
+            #             'created_at': datetime.utcnow(),
+            #             'other_user_id': ObjectId(recipe_request.user_id),
+            #             'recipe_id': insert_result.inserted_id,
+            #             'type': NotificationType.NEW_POST
+            #         }
+            # mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)
+
             return Response(status=True, msg='New recipe added', status_code=201)
         except Exception as e:
             print(e)
@@ -60,36 +69,39 @@ class RecipeRepository:
             filter = {'_id': recipe_id}
 
             update = {
-                        '$addToSet': {
-                            'likes': user_id
-                        }
-                    }
+                '$addToSet': {
+                    'likes': user_id
+                }
+            }
             updated_recipe = mongo.db[RECIPES_COLLECTION].find_one_and_update(
                 filter=filter, update=update, return_document=ReturnDocument.AFTER)
 
             if not updated_recipe:
                 return Response(status=False, msg='Recipe not found', status_code=404)
 
-
             if user_id != updated_recipe['user_id']:
                 notification: dict = {
-                        'created_at': datetime.utcnow(),
-                        'user_id': ObjectId(updated_recipe['user_id']),
-                        'other_user_id': ObjectId(like_request.user_id),
-                        'recipe_id': updated_recipe['_id'],
-                        'type': NotificationType.LIKE_POST
-                    }
-                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(document=notification)
+                    'created_at': datetime.utcnow(),
+                    'user_id': ObjectId(updated_recipe['user_id']),
+                    'other_user_id': ObjectId(like_request.user_id),
+                    'recipe_id': updated_recipe['_id'],
+                    'type': NotificationType.LIKE_POST
+                }
+                mongo.db[NOTIFICATIONS_COLLECTION].insert_one(
+                    document=notification)
 
-                user = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': ObjectId(updated_recipe['user_id'])}, {'firebase_token': 1})
-                user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': user_id}, {'display_name': 1})
+                user = mongo.db[USERS_COLLECTION].find_one_or_404(
+                    {'_id': ObjectId(updated_recipe['user_id'])}, {'firebase_token': 1})
+                user_who_liked = mongo.db[USERS_COLLECTION].find_one_or_404(
+                    {'_id': user_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_POST}', 'recipe': updated_recipe['title']})
-            
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={
+                                                    'display_name': user_who_liked['display_name'], 'type': f'{NotificationType.LIKE_POST}', 'recipe': updated_recipe['title']})
+
             return Response(status=True, msg='Likes updated', status_code=200)
         except NotFound:
-            return Response(status=False, msg='Recipe not found', status_code=404)    
+            return Response(status=False, msg='Recipe not found', status_code=404)
         except Exception as e:
             return Response(status=False, msg='Something went wrong', status_code=400)
 
@@ -102,7 +114,8 @@ class RecipeRepository:
             filter = {'_id': ObjectId(like_request.recipe_id)}
 
             mongo.db[RECIPES_COLLECTION].find_one_or_404(filter, {'_id': 1})
-            recipe_likes = mongo.db[RECIPES_COLLECTION].find_one({'_id': recipe_id, 'likes': user_id}, {'_id': 1})
+            recipe_likes = mongo.db[RECIPES_COLLECTION].find_one(
+                {'_id': recipe_id, 'likes': user_id}, {'_id': 1})
 
             if recipe_likes:
                 update = {
@@ -113,7 +126,7 @@ class RecipeRepository:
                         'likes_count': -1
                     }
                 }
-                
+
                 updated_recipe = mongo.db[RECIPES_COLLECTION].find_one_and_update(
                     filter=filter, update=update, return_document=ReturnDocument.AFTER)
 
@@ -122,7 +135,7 @@ class RecipeRepository:
 
             return Response(status=True, msg='Likes updated', status_code=200)
         except NotFound:
-            return Response(status=False, msg='Recipe not found', status_code=404)    
+            return Response(status=False, msg='Recipe not found', status_code=404)
         except Exception as e:
             return Response(status=False, msg='Something went wrong', status_code=400)
 
@@ -157,5 +170,138 @@ class RecipeRepository:
                 return Response(status=False, msg='User not found', status_code=404)
 
             return Response(status=True, msg='Favorites updated', status_code=200)
+        except Exception as e:
+            print(e)
+
+    @staticmethod
+    def get_recipe(recipe_id: str, user_id: str):
+        try:
+            if not recipe_id:
+                return Response(status=False, msg='Invalid recipe id', status_code=400)
+
+            # if not user_id:
+            #     return Response(status=False, msg='Invalid user id', status_code=400)
+
+            try:
+                recipe_id = ObjectId(recipe_id)
+
+                if user_id:
+                    user_id = ObjectId(user_id)
+            except:
+                return Response(status=False, msg='Invalid object id', status_code=400)
+
+            recipe = mongo.db[RECIPES_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        '_id': recipe_id
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': 'media',
+                        'localField': '_id',
+                        'foreignField': 'recipe_id',
+                        'as': 'media'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': 'users',
+                        'localField': 'user_id',
+                        'foreignField': '_id',
+                        'as': 'user'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': COMMENTS_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'recipe_id',
+                        'as': 'comments'
+                    }
+                },
+                {
+                    '$project': {
+                        'user': {
+                            '$arrayElemAt': [
+                                '$user', 0
+                            ]
+                        },
+                        'description': 1,
+                        'ingredients': 1,
+                        'category': 1,
+                        'media': 1,
+                        'title': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
+                        'likes': 1,
+                        'favorites': 1,
+                        'comments_count': {
+                            '$size': '$comments'
+                        }
+                    }
+                },
+                {
+                    '$addFields': {
+                        'is_favorite': {
+                            '$in': [user_id, '$favorites']
+                        }
+                    }
+                },
+                {
+                    '$addFields': {'user.is_following': {
+                        '$in': [user_id, '$user.followers']
+                    }
+                    }
+                },
+                {
+                    '$addFields': {'is_liked': {
+                        '$in': [user_id, '$likes']
+                    }
+                    }
+                },
+                {
+                    '$addFields': {
+                        'user.followers_count': {
+                            '$size': '$user.followers'
+                        }
+                    }
+                },
+                {
+                    '$addFields': {
+                        'user.following_count': {
+                            '$size': '$user.following'
+                        }
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': RECIPES_COLLECTION,
+                        'as': 'posts',
+                        'localField': 'user._id',
+                        'foreignField': 'user_id'
+                    }
+                },
+                {
+                    '$addFields': {
+                        'user.posts_count': {
+                            '$size': '$posts'
+                        }
+                    }
+                },
+                {
+                    '$project': {
+                        'posts': 0
+                    }
+                },
+                {
+                    '$project': {
+                        'user.password': 0,
+                        'likes': 0
+                    }
+                }])
+
+            return recipe
         except Exception as e:
             print(e)
