@@ -458,6 +458,14 @@ class UserRepository:
                     }
                 },
                 {
+                    '$lookup': {
+                        'from': COMMENTS_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'recipe_id',
+                        'as': 'comments'
+                    }
+                },
+                {
                     '$project': {
                         'user': {
                             '$arrayElemAt': [
@@ -469,10 +477,14 @@ class UserRepository:
                         'category': 1,
                         'media': 1,
                         'title': 1,
-                        'likes_count': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
                         'likes': 1,
                         'favorites': 1,
-                        'comments_count': 1
+                        'comments_count': {
+                            '$size': '$comments'
+                        }
                     }
                 },
                 {
