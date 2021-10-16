@@ -27,10 +27,10 @@ def upload_file(upload_folder: str, upload_type: str, _id: str, file: FileStorag
 
     if upload_type == 'videos': 
         video = ffmpeg_streaming.input(save_path)
-        dash = video.dash(Formats.h264())
-        dash.auto_generate_representations()
-        video_name_with_ext = "{}.{}".format(file.filename.rsplit(".", 1)[0], "mpd")
-        dash.output(os.path.join(parent_path, video_name_with_ext))
+        hls = video.hls(Formats.h264())
+        hls.auto_generate_representations()
+        video_name_with_ext = "{}.{}".format(file.filename.rsplit(".", 1)[0], "m3u8")
+        hls.output(os.path.join(parent_path, video_name_with_ext))
         os.remove(path=save_path)
         return os.path.join(upload_folder, upload_type, _id, video_name_with_ext)
 
