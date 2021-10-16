@@ -699,7 +699,6 @@ class UserRepository:
             update_dict = {
                 '$set': {
                     'display_name': edit_profile_request.display_name,
-                    'email': edit_profile_request.email,
                     'image': image_path
                 }
             }

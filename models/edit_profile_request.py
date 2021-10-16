@@ -4,7 +4,6 @@ from werkzeug.datastructures import FileStorage
 
 class EditProfileRequest(BaseModel):
     user_id: str
-    email: str
     display_name: str
     image: Optional[FileStorage] = None
 
