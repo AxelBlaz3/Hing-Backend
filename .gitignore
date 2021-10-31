@@ -3,3 +3,6 @@
 
 # Virtual env
 env/
+
+# Pycache
+__pycache__/
