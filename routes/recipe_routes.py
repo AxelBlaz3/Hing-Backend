@@ -2,18 +2,20 @@ from models.like_request import LikeRequest
 from models.recipe_request import RecipeRequest
 from repository.recipe_repository import RecipeRepository
 from routes import recipe_api
-from constants import ADD_TO_FAVORITES_ENDPOINT, GET_RECIPE_ENDPOINT, LIKE_RECIPE_ENDPOINT, NEW_RECIPE_ENDPOINT, REMOVE_FROM_FAVORITES_ENDPOINT, UNLIKE_RECIPE_ENDPOINT
+from constants import ADD_TO_FAVORITES_ENDPOINT, GET_RECIPE_ENDPOINT, GET_RECIPE_LIKES_ENDPOINT, LIKE_RECIPE_ENDPOINT, NEW_RECIPE_ENDPOINT, REMOVE_FROM_FAVORITES_ENDPOINT, UNLIKE_RECIPE_ENDPOINT
 from pydantic.error_wrappers import ValidationError
 from models.response import Response
 from flask import jsonify, request, json, current_app
 from bson import json_util
+
 
 @recipe_api.post(NEW_RECIPE_ENDPOINT)
 def new_recipe():
     try:
         recipe_request = RecipeRequest(**request.form.to_dict())
 
-        result = RecipeRepository.create_recipe(current_app.config['UPLOAD_FOLDER'], request.files, recipe_request)
+        result = RecipeRepository.create_recipe(
+            current_app.config['UPLOAD_FOLDER'], request.files, recipe_request)
 
         return result.dict(), result.status_code
     except ValidationError as e:
@@ -21,7 +23,7 @@ def new_recipe():
         return e.json(), 400
     except Exception as e:
         print(e)
-        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400    
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
 
 
 @recipe_api.get(GET_RECIPE_ENDPOINT)
@@ -29,14 +31,16 @@ def get_recipe():
     try:
         recipe_id = request.args.get('recipe_id')
         user_id = request.args.get('user_id')
-        recipe = RecipeRepository.get_recipe(user_id=user_id, recipe_id=recipe_id)        
+        recipe = RecipeRepository.get_recipe(
+            user_id=user_id, recipe_id=recipe_id)
 
         if not recipe:
             return {}
 
-        return jsonify(json.loads(json_util.dumps(recipe.next())))    
-    except:  
-        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400     
+        return jsonify(json.loads(json_util.dumps(recipe.next())))
+    except:
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
+
 
 @recipe_api.put(LIKE_RECIPE_ENDPOINT)
 def like_recipe():
@@ -50,7 +54,7 @@ def like_recipe():
         return e.json(), 400
     except Exception as e:
         print(e)
-        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400 
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
 
 
 @recipe_api.put(UNLIKE_RECIPE_ENDPOINT)
@@ -65,8 +69,7 @@ def unlike_recipe():
         return e.json(), 400
     except Exception as e:
         print(e)
-        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400 
-
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
 
 
 @recipe_api.put(ADD_TO_FAVORITES_ENDPOINT)
@@ -89,11 +92,27 @@ def unfavorite_recipe():
     try:
         like_request = LikeRequest(**request.json)
 
-        result = RecipeRepository.remove_from_favorites(like_request=like_request)
+        result = RecipeRepository.remove_from_favorites(
+            like_request=like_request)
 
         return result.dict(), result.status_code
     except ValidationError as e:
         return e.json(), 400
     except Exception as e:
         print(e)
-        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400                         
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
+
+
+@recipe_api.get(GET_RECIPE_LIKES_ENDPOINT)
+def get_who_liked(recipe_id):
+    try:
+        page = request.args.get(key='page', default=1, type=int)
+        user_id = request.args.get('user_id', default=None)
+        result = RecipeRepository.get_who_liked(recipe_id=recipe_id, user_id=user_id, page=page)
+
+        return jsonify(json.loads(json_util.dumps(result)))
+    except ValidationError as e:
+        return e.json(), 400
+    except Exception as e:
+        print(e)
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400

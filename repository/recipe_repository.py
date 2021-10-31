@@ -305,3 +305,71 @@ class RecipeRepository:
             return recipe
         except Exception as e:
             print(e)
+
+    @staticmethod
+    def get_who_liked(recipe_id: str, user_id: str, page: int = 1, per_page: int = 10):
+        try:
+            recipe_id = ObjectId(recipe_id)
+            user_id = ObjectId(user_id)
+            likes = mongo.db[RECIPES_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        '_id': recipe_id
+                    }
+                },
+                {
+                    '$skip': 0 if page <= 1 else per_page * (page - 1)
+                },
+                {
+                    '$limit': per_page
+                },
+                {
+                    '$project': {
+                        '_id': 0,
+                        'likes': 1
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': 'users',
+                        'as': 'users',
+                        'let': {
+                            'likes': '$likes'
+                        },
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$in': [
+                                            '$_id', '$$likes'
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                '$addFields': {
+                                    'is_following': {
+                                        '$in': [user_id, '$followers']
+                                    }
+                                }
+                            },
+                            {
+                                '$project': {
+                                    '_id': 1,
+                                    'display_name': 1,
+                                    'image': 1,
+                                    'is_following': 1
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    '$project': {
+                        'likes': 0
+                    }
+                }
+            ])
+            return likes.next()['users']
+        except Exception as e:
+            return []
