@@ -1,0 +1,8 @@
+# Env variables
+.env
+
+# Virtual env
+env/
+
+# Pycache
+__pycache__/
