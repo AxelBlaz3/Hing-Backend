@@ -7,6 +7,7 @@ from pymongo.message import update
 from pymongo.results import UpdateResult
 from werkzeug.datastructures import FileStorage
 from models.create_password_request import CreatePasswordRequest
+from models.my_ingredients_update import MyIngredientsUpdateRequest
 from repository.uploads import upload_file
 from models.edit_profile_request import EditProfileRequest
 from datetime import datetime
@@ -15,7 +16,7 @@ from models.follow_request import FollowRequest
 from bson.objectid import ObjectId
 import pymongo
 from pymongo.command_cursor import CommandCursor
-from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
+from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, REPLIES_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
 from models.response import Response
 from typing import Union
 from repository import mongo, bcrypt
@@ -547,11 +548,14 @@ class UserRepository:
                 mongo.db[NOTIFICATIONS_COLLECTION].insert_one(
                     document=notification)
 
-                user = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': followee_id}, {'firebase_token': 1})
-                user_who_followed = mongo.db[USERS_COLLECTION].find_one_or_404({'_id': follower_id}, {'display_name': 1})
+                user = mongo.db[USERS_COLLECTION].find_one_or_404(
+                    {'_id': followee_id}, {'firebase_token': 1})
+                user_who_followed = mongo.db[USERS_COLLECTION].find_one_or_404(
+                    {'_id': follower_id}, {'display_name': 1})
 
                 if 'firebase_token' in user and user['firebase_token']:
-                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={'display_name': user_who_followed['display_name'], 'type': f'{NotificationType.NEW_FOLLOWER}'})
+                    FirebaseUtils.send_notification(token=user['firebase_token'], image=None, notification_data={
+                                                    'display_name': user_who_followed['display_name'], 'type': f'{NotificationType.NEW_FOLLOWER}'})
 
             return Response(status=True, msg='Followers updated', status_code=200)
         except:
@@ -721,11 +725,30 @@ class UserRepository:
             if 'user_id' not in payload or not payload['user_id']:
                 return Response(status=False, msg='Invalid user id', status_code=400)
 
-            user = mongo.db[USERS_COLLECTION].find_one_and_update(filter={'_id': ObjectId(payload['user_id'])}, update={'$set': {'firebase_token': payload['firebase_token']}}, return_document=ReturnDocument.AFTER, upsert=True)
+            user = mongo.db[USERS_COLLECTION].find_one_and_update(filter={'_id': ObjectId(payload['user_id'])}, update={
+                                                                  '$set': {'firebase_token': payload['firebase_token']}}, return_document=ReturnDocument.AFTER, upsert=True)
 
             if not user:
                 return Response(status=False, msg='No user found', status_code=404)
-            
+
             return Response(status=True, msg='Token updated', status_code=200)
-        except:           
+        except:
+            return Response(status=False, msg='Something went wrong', status_code=400)
+
+    @staticmethod
+    def update_user_ingredients(my_ingredients_update_request: MyIngredientsUpdateRequest):
+        try:
+            user_id = ObjectId(my_ingredients_update_request.user_id)
+            recipe_id = ObjectId(my_ingredients_update_request.recipe_id)
+            data = my_ingredients_update_request.dict()
+            data.update({'user_id': user_id, 'recipe_id': recipe_id})
+            mongo.db[USER_INGREDIENTS_COLLECTION].update_one(filter={
+                'user_id': user_id,
+                'recipe_id': recipe_id
+            },
+                update={
+                    '$set': data
+            }, upsert=True)
+            return Response(status=True, msg='Ingredients updated', status_code=200)
+        except:
             return Response(status=False, msg='Something went wrong', status_code=400)

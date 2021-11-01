@@ -3,12 +3,13 @@ from models.edit_profile_request import EditProfileRequest
 from models.follow_request import FollowRequest
 from bson.objectid import ObjectId
 from pymongo.command_cursor import CommandCursor
+from models.my_ingredients_update import MyIngredientsUpdateRequest
 from models.response import Response
 from flask import json
 from bson import json_util
 from flask.json import jsonify
 from routes import user_api
-from constants import CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT
+from constants import CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT, UPDATE_MY_INGREDIENTS_ENDPOINT
 from models.signup_request import SignupRequest
 from models.login_request import LoginRequest
 from pydantic.error_wrappers import ValidationError
@@ -198,3 +199,16 @@ def send_reset_code():
     result = UserRepository.send_verification_code(email=email)
 
     return result.dict(), result.status_code
+
+
+@user_api.put(UPDATE_MY_INGREDIENTS_ENDPOINT)
+def update_my_ingredients():
+    try:
+        payload = request.json
+        my_ingredients_update_request = MyIngredientsUpdateRequest(**payload if payload is not None else {})
+    except ValidationError as e:
+        return e.json(), 400
+
+    result = UserRepository.update_user_ingredients(my_ingredients_update_request=my_ingredients_update_request)
+    
+    return result.dict(), result.status_code   
