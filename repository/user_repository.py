@@ -405,6 +405,51 @@ class UserRepository:
                     }
                 },
                 {
+                    '$lookup': {
+                        'from': USER_INGREDIENTS_COLLECTION,
+                        'as': 'my_ingredients',
+                        'let': {
+                            'recipeId': '$_id'
+                        },
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {'$eq': ['$user_id', other_user_id]},
+                                            {'$eq': [
+                                                '$recipe_id', '$$recipeId']}
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                '$limit': 1
+                            },
+                            {
+                                '$project': {
+                                    'ingredients': 1,
+                                    '_id': 0
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    '$addFields': {
+                        'my_ingredients': {
+                            '$getField': {
+                                'field': 'ingredients',
+                                'input': {
+                                    '$arrayElemAt': [
+                                    '$my_ingredients', 0
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
                     '$project': {
                         'user.password': 0,
                         'user.email': 0,
@@ -505,6 +550,51 @@ class UserRepository:
                     '$addFields': {'is_liked': {
                         '$in': [user_id, '$likes']
                     }
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': USER_INGREDIENTS_COLLECTION,
+                        'as': 'my_ingredients',
+                        'let': {
+                            'recipeId': '$_id'
+                        },
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {'$eq': ['$user_id', user_id]},
+                                            {'$eq': [
+                                                '$recipe_id', '$$recipeId']}
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                '$limit': 1
+                            },
+                            {
+                                '$project': {
+                                    'ingredients': 1,
+                                    '_id': 0
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    '$addFields': {
+                        'my_ingredients': {
+                            '$getField': {
+                                'field': 'ingredients',
+                                'input': {
+                                    '$arrayElemAt': [
+                                    '$my_ingredients', 0
+                                    ]
+                                }
+                            }
+                        }
                     }
                 },
                 {

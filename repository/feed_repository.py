@@ -3,7 +3,7 @@ import pymongo
 from models.response import Response
 from typing import Union
 from repository import mongo
-from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION
+from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION
 
 
 class FeedRepository:
@@ -126,14 +126,59 @@ class FeedRepository:
                     }
                 },
                 {
-                    '$project': {
-                        'posts': 0
+                    '$lookup': {
+                        'from': USER_INGREDIENTS_COLLECTION,
+                        'as': 'my_ingredients',
+                        'let': {
+                            'recipeId': '$_id',
+                            'userId': '$user._id'
+                        },
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {'$eq': ['$user_id', '$$userId']},
+                                            {'$eq': [
+                                                '$recipe_id', '$$recipeId']}
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                '$limit': 1
+                            },
+                            {
+                                '$project': {
+                                    'ingredients': 1,
+                                    '_id': 0
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    '$addFields': {
+                        'my_ingredients': {
+                            '$getField': {
+                                'field': 'ingredients',
+                                'input': {
+                                    '$arrayElemAt': [
+                                    '$my_ingredients', 0
+                                    ]
+                                }
+                            }
+                        }
                     }
                 },
                 {
                     '$project': {
+                        'posts': 0,
+                        'likes': 0,
                         'user.password': 0,
-                        'likes': 0
+                        'user.following': 0,
+                        'user.followers': 0,
+                        'user.firebase_token': 0
                     }
                 }])
             recipes = mongo.db[RECIPES_COLLECTION].aggregate(pipeline=pipeline)
