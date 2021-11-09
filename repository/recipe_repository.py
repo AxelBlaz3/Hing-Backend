@@ -1,12 +1,14 @@
+from flask_pymongo import PyMongo
+import pymongo
+from pymongo.command_cursor import CommandCursor
 from werkzeug.exceptions import NotFound
-from pymongo.message import update
 from models.like_request import LikeRequest
 from pymongo.collection import ReturnDocument
 from pymongo.results import InsertOneResult
 from models.response import Response
 from typing import List
 from repository import uploads, mongo
-from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, REPLIES_COLLECTION, USERS_COLLECTION
+from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
 from extensions import MediaType, NotificationType
 from flask import json
 from bson import ObjectId
@@ -372,4 +374,150 @@ class RecipeRepository:
             ])
             return likes.next()['users']
         except Exception as e:
+            return []
+
+    @staticmethod
+    def search_recipes(query: str, user_id: str, page: int = 1, per_page: int = 10):
+        try:
+            user_id = ObjectId(user_id)
+            recipes: CommandCursor = mongo.db[RECIPES_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        'title':
+                            {'$regex': f'{query}.*', '$options': 'i'}
+                    }
+                },
+                {
+                    '$sort': {
+                        'created_at': pymongo.DESCENDING
+                    }
+                },
+                {
+                    '$skip': 0 if page <= 1 else per_page * (page - 1)
+                },
+                {
+                    '$limit': per_page
+                },
+                {
+                    '$lookup': {
+                        'from': 'media',
+                        'localField': '_id',
+                        'foreignField': 'recipe_id',
+                        'as': 'media'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': 'users',
+                        'localField': 'user_id',
+                        'foreignField': '_id',
+                        'as': 'user'
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': COMMENTS_COLLECTION,
+                        'localField': '_id',
+                        'foreignField': 'recipe_id',
+                        'as': 'comments'
+                    }
+                },
+                {
+                    '$project': {
+                        'user': {
+                            '$arrayElemAt': [
+                                '$user', 0
+                            ]
+                        },
+                        'description': 1,
+                        'ingredients': 1,
+                        'category': 1,
+                        'media': 1,
+                        'title': 1,
+                        'likes_count': {
+                            '$size': '$likes'
+                        },
+                        'likes': 1,
+                        'favorites': 1,
+                        'comments_count': {
+                            '$size': '$comments'
+                        }
+                    }
+                },
+                {
+                    '$addFields': {
+                        'is_favorite': {
+                            '$in': [user_id, '$favorites']
+                        }
+                    }
+                },
+                {
+                    '$addFields': {'user.is_following': {
+                        '$in': [user_id, '$user.followers']
+                    }
+                    }
+                },
+                {
+                    '$addFields': {'is_liked': {
+                        '$in': [user_id, '$likes']
+                    }
+                    }
+                },
+                {
+                    '$lookup': {
+                        'from': USER_INGREDIENTS_COLLECTION,
+                        'as': 'my_ingredients',
+                        'let': {
+                            'recipeId': '$_id'
+                        },
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$and': [
+                                            {'$eq': ['$user_id', user_id]},
+                                            {'$eq': [
+                                                '$recipe_id', '$$recipeId']}
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                '$limit': 1
+                            },
+                            {
+                                '$project': {
+                                    'ingredients': 1,
+                                    '_id': 0
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    '$addFields': {
+                        'my_ingredients': {
+                            '$getField': {
+                                'field': 'ingredients',
+                                'input': {
+                                    '$arrayElemAt': [
+                                        '$my_ingredients', 0
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    '$project': {
+                        'user.password': 0,
+                        'user.email': 0,
+                        'user.followers': 0,
+                        'user.following': 0,
+                        'likes': 0
+                    }
+                }
+            ])
+            return recipes
+        except:
             return []

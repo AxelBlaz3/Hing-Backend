@@ -2,7 +2,7 @@ from models.like_request import LikeRequest
 from models.recipe_request import RecipeRequest
 from repository.recipe_repository import RecipeRepository
 from routes import recipe_api
-from constants import ADD_TO_FAVORITES_ENDPOINT, GET_RECIPE_ENDPOINT, GET_RECIPE_LIKES_ENDPOINT, LIKE_RECIPE_ENDPOINT, NEW_RECIPE_ENDPOINT, REMOVE_FROM_FAVORITES_ENDPOINT, UNLIKE_RECIPE_ENDPOINT
+from constants import ADD_TO_FAVORITES_ENDPOINT, GET_RECIPE_ENDPOINT, GET_RECIPE_LIKES_ENDPOINT, LIKE_RECIPE_ENDPOINT, NEW_RECIPE_ENDPOINT, REMOVE_FROM_FAVORITES_ENDPOINT, SEARCH_RECIPES_ENDPOINT, UNLIKE_RECIPE_ENDPOINT
 from pydantic.error_wrappers import ValidationError
 from models.response import Response
 from flask import jsonify, request, json, current_app
@@ -109,6 +109,21 @@ def get_who_liked(recipe_id):
         page = request.args.get(key='page', default=1, type=int)
         user_id = request.args.get('user_id', default=None)
         result = RecipeRepository.get_who_liked(recipe_id=recipe_id, user_id=user_id, page=page)
+
+        return jsonify(json.loads(json_util.dumps(result)))
+    except ValidationError as e:
+        return e.json(), 400
+    except Exception as e:
+        print(e)
+        return Response(status=False, msg='Some error occured', status_code=400).dict(), 400
+
+
+@recipe_api.get(SEARCH_RECIPES_ENDPOINT)
+def searh_recipes(query):
+    try:
+        page = request.args.get(key='page', default=1, type=int)
+        user_id = request.args.get('user_id', default=None)
+        result = RecipeRepository.search_recipes(query=query, user_id=user_id, page=page)
 
         return jsonify(json.loads(json_util.dumps(result)))
     except ValidationError as e:
