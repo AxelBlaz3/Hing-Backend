@@ -1,6 +1,8 @@
+from flask.typing import StatusCode
 from flask_pymongo import PyMongo
 import pymongo
 from pymongo.command_cursor import CommandCursor
+from pymongo.message import update
 from werkzeug.exceptions import NotFound
 from models.like_request import LikeRequest
 from pymongo.collection import ReturnDocument
@@ -10,8 +12,8 @@ from typing import List
 from repository import uploads, mongo
 from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
 from extensions import MediaType, NotificationType
-from flask import json
-from bson import ObjectId
+from flask import json, request
+from bson import ObjectId, json_util
 from datetime import datetime
 from common.firebase_utils import FirebaseUtils
 
@@ -30,8 +32,7 @@ class RecipeRepository:
 
             recipe_dict = recipe_request.dict()
             recipe_dict['created_at'] = datetime.utcnow()
-            insert_result: InsertOneResult = mongo.db[RECIPES_COLLECTION].insert_one(recipe_dict
-                                                                                     )
+            insert_result: InsertOneResult = mongo.db[RECIPES_COLLECTION].insert_one(recipe_dict)
 
             # Upload media
             media: List[str] = []
@@ -140,6 +141,9 @@ class RecipeRepository:
             return Response(status=False, msg='Recipe not found', status_code=404)
         except Exception as e:
             return Response(status=False, msg='Something went wrong', status_code=400)
+
+        
+
 
     @staticmethod
     def add_to_favorites(like_request: LikeRequest) -> Response:
@@ -521,3 +525,48 @@ class RecipeRepository:
             return recipes
         except:
             return []
+
+    #report recipe
+    @staticmethod
+    def create_recipe_report(report_reason,user_id,recipe_id):
+        try:
+            insert_result:InsertOneResult=mongo.db[RECIPES_COLLECTION].insert_one(document={"report_reason":report_reason,"user_id":user_id,"recipe_id":recipe_id})
+            reported_recipe=mongo.db[RECIPES_COLLECTION].find_one_and_update(filter={'_id':insert_result.inserted_id},upsert=True,return_document=ReturnDocument.AFTER)
+            return reported_recipe        
+        except Exception as e:
+            print(e)
+            return Response(status=False, msg='Something went wrong', status_code=400)
+        except Exception as e:
+            print(f'{type(e)}: {e}')
+            return {}
+
+
+            
+    @staticmethod
+    def get_reported_recipe(user_id:str,recipe_id:str):
+        try:
+            user_id=ObjectId(user_id)
+            recipe_id=ObjectId(recipe_id)
+            filter={'_id':recipe_id}
+            mongo.db[RECIPES_COLLECTION].find_one_or_404(filter)
+            reported_recipe=mongo.db[RECIPES_COLLECTION].find_one({'_id':recipe_id})
+
+            if reported_recipe:
+                update={
+                    '$pull':{
+                    'recipe_id':ObjectId(recipe_id)
+                    }
+                }
+
+                updated_reported_recipe=mongo.db[RECIPES_COLLECTION].find_one_and_update(filter=filter,update=update,return_document=ReturnDocument.AFTER)
+
+                if not updated_reported_recipe:
+                    return Response(status=False,msg='Recipe Not Found',status_code=404)
+        
+            return Response(status=True, msg='Report done', status_code=200)   
+        except NotFound:
+            return Response(status=False,msg='Recipe Not Found',status_code=404)
+        except Exception as e:
+            return  Response(status=False,msg='Something went wrong',status_code=400)              
+    
+   
