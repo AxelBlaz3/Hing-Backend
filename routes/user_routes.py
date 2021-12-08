@@ -1,3 +1,4 @@
+from models.change_password import ChangePasswordRequest
 from models.create_password_request import CreatePasswordRequest
 from models.edit_profile_request import EditProfileRequest
 from models.follow_request import FollowRequest
@@ -9,7 +10,7 @@ from flask import json
 from bson import json_util
 from flask.json import jsonify
 from routes import user_api
-from constants import CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT, UPDATE_MY_INGREDIENTS_ENDPOINT
+from constants import CHANGE_PASSWORD_ENDPOINT, CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT, UPDATE_MY_INGREDIENTS_ENDPOINT
 from models.signup_request import SignupRequest
 from models.login_request import LoginRequest
 from pydantic.error_wrappers import ValidationError
@@ -190,6 +191,18 @@ def create_new_password():
     result = UserRepository.create_new_password(create_password_request=create_password_request)
     
     return result.dict(), result.status_code   
+
+@user_api.put(CHANGE_PASSWORD_ENDPOINT)
+@validate()
+def change_password():
+    try:
+        change_password_request=ChangePasswordRequest(**request.json)
+    except ValidationError as e:
+        return e.json(),400
+    
+    result = UserRepository.change_password(change_password_request=change_password_request)
+
+    return result.dict(), result.status_code
 
 
 @user_api.post(SEND_RESET_CODE_ENDPOINT)

@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from flask_bcrypt import Bcrypt
 from config import Config, StagingConfig, ProductionConfig
 from routes.user_routes import user_api
 from routes.recipe_routes import recipe_api
