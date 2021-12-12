@@ -30,7 +30,7 @@ from common.firebase_utils import FirebaseUtils
 
 
 class UserRepository:
-#login user
+    # login user
     @classmethod
     def login(*args) -> Union[dict, Response]:
         _, login_request = args
@@ -99,7 +99,7 @@ class UserRepository:
         except Exception:
             return Response(status_code=400, msg='Some error occured', status=False)
 
-    #sign up user
+    # sign up user
     @staticmethod
     def signup(signup_request) -> Union[dict, Response]:
         mongo.db[USERS_COLLECTION].create_index('email', unique=True)
@@ -121,8 +121,8 @@ class UserRepository:
             print(e)
             return Response(status_code=400, msg='Some error occured', status=False)
 
-    
-    #send verification code
+    # send verification code
+
     @staticmethod
     def send_verification_code(email: str) -> Response:
         try:
@@ -151,7 +151,7 @@ class UserRepository:
             print(f'{type(e)}: {e}')
             return Response(status_code=400, msg='Some error occured', status=False)
 
-    #create new password
+    # create new password
     @staticmethod
     def create_new_password(create_password_request: CreatePasswordRequest):
         try:
@@ -178,30 +178,30 @@ class UserRepository:
         except:
             return Response(status_code=400, msg='Something went wrong', status=False)
 
-    
-    #change password
+    # change password
+
     @staticmethod
-    def change_password(password_change:ChangePasswordRequest):
+    def change_password(password_change: ChangePasswordRequest):
         try:
-            filter={'user_id':password_change.user_id}
-            user_password=mongo.db[USERS_COLLECTION].find_one_or_404(filter=filter)
+            filter = {'user_id': password_change.user_id}
+            user_password = mongo.db[USERS_COLLECTION].find_one_or_404(
+                filter=filter)
 
-            update_result:UpdateResult=mongo.db[USERS_COLLECTION].update_one(filter=filter,update={'$set':{'password':bcrypt.generate_password_hash(password=password_change.password)}}
-            )
+            update_result: UpdateResult = mongo.db[USERS_COLLECTION].update_one(filter=filter, update={'$set': {'password': bcrypt.generate_password_hash(password=password_change.password)}}
+                                                                                )
 
-            if update_result.modified_count>0:
-                return Response(status_code=200,msg='Password Changed',status=True)
-            
-            return Response(status_code=400,msg='Something went wrong',status=False)
+            if update_result.modified_count > 0:
+                return Response(status_code=200, msg='Password Changed', status=True)
+
+            return Response(status_code=400, msg='Something went wrong', status=False)
 
         except NotFound:
-            return Response(status_code=404, msg='Could not change password',status=False)
+            return Response(status_code=404, msg='Could not change password', status=False)
         except:
-            return Response(status_code=400,msg='Some Error Occured',status=False)
-
-
+            return Response(status_code=400, msg='Some Error Occured', status=False)
 
     # get followers
+
     @staticmethod
     def get_followers(user_id, other_user_id, page=1, per_page=10) -> Union[CommandCursor, Response]:
         try:
@@ -273,7 +273,7 @@ class UserRepository:
             print(e)
             return []
 
-    #get following list
+    # get following list
 
     @staticmethod
     def get_following(user_id, other_user_id, page=1, per_page=10) -> Union[CommandCursor, Response]:
@@ -343,7 +343,7 @@ class UserRepository:
             print(e)
             return []
 
-    #get user related post
+    # get user related post
 
     @staticmethod
     def get_posts(user_id, other_user_id, page=1, per_page=10):
@@ -358,7 +358,10 @@ class UserRepository:
                 {
                     '$match': {
                         '$expr': {
-                            '$eq': ['$user_id', user_id]
+                            '$and': [
+                                {'$eq': ['$user_id', user_id]},
+                                {'$not': {'$in': [user_id, '$reported_users']}}
+                            ]
                         }
                     }
                 },
@@ -450,7 +453,8 @@ class UserRepository:
                                 '$match': {
                                     '$expr': {
                                         '$and': [
-                                            {'$eq': ['$user_id', other_user_id]},
+                                            {'$eq': ['$user_id',
+                                                     other_user_id]},
                                             {'$eq': [
                                                 '$recipe_id', '$$recipeId']}
                                         ]
@@ -469,20 +473,20 @@ class UserRepository:
                         ]
                     }
                 },
-                {
-                    '$addFields': {
-                        'my_ingredients': {
-                            '$getField': {
-                                'field': 'ingredients',
-                                'input': {
-                                    '$arrayElemAt': [
-                                    '$my_ingredients', 0
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                },
+                # {
+                #     '$addFields': {
+                #         'my_ingredients': {
+                #             '$getField': {
+                #                 'field': 'ingredients',
+                #                 'input': {
+                #                     '$arrayElemAt': [
+                #                         '$my_ingredients', 0
+                #                     ]
+                #                 }
+                #             }
+                #         }
+                #     }
+                # },
                 {
                     '$project': {
                         'user.password': 0,
@@ -508,7 +512,9 @@ class UserRepository:
                 {
                     '$match': {
                         '$expr': {
-                            '$in': [user_id, '$favorites']
+                            '$and': [
+                                {'$in': [user_id, '$favorites']},
+                                {'$not': {'$in': [user_id, '$reported_users']}}]
                         }
                     }
                 },
@@ -619,20 +625,20 @@ class UserRepository:
                         ]
                     }
                 },
-                {
-                    '$addFields': {
-                        'my_ingredients': {
-                            '$getField': {
-                                'field': 'ingredients',
-                                'input': {
-                                    '$arrayElemAt': [
-                                    '$my_ingredients', 0
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                },
+                # {
+                #     '$addFields': {
+                #         'my_ingredients': {
+                #             '$getField': {
+                #                 'field': 'ingredients',
+                #                 'input': {
+                #                     '$arrayElemAt': [
+                #                         '$my_ingredients', 0
+                #                     ]
+                #                 }
+                #             }
+                #         }
+                #     }
+                # },
                 {
                     '$project': {
                         'user.password': 0,
@@ -646,7 +652,7 @@ class UserRepository:
             return recipes
         except:
             return []
-    
+
     # follow  user
 
     @staticmethod
@@ -691,7 +697,7 @@ class UserRepository:
 
         return Response(status=False, msg='Something went wrong', status_code=400)
 
-    #unfollow user
+    # unfollow user
 
     @staticmethod
     def unfollow_user(follow_request: FollowRequest):
@@ -710,7 +716,7 @@ class UserRepository:
 
         return Response(status=False, msg='Something went wrong', status_code=400)
 
-    #get notifications
+    # get notifications
 
     @staticmethod
     def get_notifications(user_id: str, page: int = 1, per_page: int = 10):
@@ -871,7 +877,7 @@ class UserRepository:
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
 
-    #update  user ingredients
+    # update  user ingredients
 
     @staticmethod
     def update_user_ingredients(my_ingredients_update_request: MyIngredientsUpdateRequest):
@@ -890,5 +896,3 @@ class UserRepository:
             return Response(status=True, msg='Ingredients updated', status_code=200)
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
-
-   

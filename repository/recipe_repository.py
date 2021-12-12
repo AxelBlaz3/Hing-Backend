@@ -386,8 +386,13 @@ class RecipeRepository:
             recipes: CommandCursor = mongo.db[RECIPES_COLLECTION].aggregate([
                 {
                     '$match': {
-                        'title':
-                            {'$regex': f'{query}.*', '$options': 'i'}
+                        '$expr': {
+                            '$and': [
+                                {
+                                '$regexMatch': {'input': '$title', 'regex': f'{query}.*', 'options': 'i'}},
+                                {'$not': {'$in': [user_id, '$reported_users']}}
+                            ]
+                        }
                     }
                 },
                 {
@@ -497,20 +502,20 @@ class RecipeRepository:
                         ]
                     }
                 },
-                {
-                    '$addFields': {
-                        'my_ingredients': {
-                            '$getField': {
-                                'field': 'ingredients',
-                                'input': {
-                                    '$arrayElemAt': [
-                                        '$my_ingredients', 0
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                },
+                # {
+                #     '$addFields': {
+                #         'my_ingredients': {
+                #             '$getField': {
+                #                 'field': 'ingredients',
+                #                 'input': {
+                #                     '$arrayElemAt': [
+                #                         '$my_ingredients', 0
+                #                     ]
+                #                 }
+                #             }
+                #         }
+                #     }
+                # },
                 {
                     '$project': {
                         'user.password': 0,
@@ -522,7 +527,8 @@ class RecipeRepository:
                 }
             ])
             return recipes
-        except:
+        except Exception as e:
+            print(e)
             return []
 
     # report recipe
@@ -531,11 +537,14 @@ class RecipeRepository:
         try:
             report_data_dict = report_recipe_request.dict()
 
-            report_recipe_request['user_id'] = ObjectId(
-                report_recipe_request['user_id'])
-            report_recipe_request['recipe_id'] = ObjectId(
-                report_recipe_request['recipe_id'])
+            report_data_dict['user_id'] = ObjectId(
+                report_recipe_request.user_id)
+            report_data_dict['recipe_id'] = ObjectId(
+                report_recipe_request.recipe_id)
 
+            mongo.db[RECIPES_COLLECTION].find_one_and_update(filter={'_id': report_data_dict['recipe_id']}, update={
+                '$push': {'reported_users': report_data_dict['user_id']}
+            }, return_document=ReturnDocument.AFTER)
             mongo.db[REPORTED_RECIPES_COLLECTION].insert_one(
                 document=report_data_dict)
 

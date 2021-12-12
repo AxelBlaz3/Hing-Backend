@@ -3,7 +3,7 @@ import pymongo
 from models.response import Response
 from typing import Union
 from repository import mongo
-from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION
+from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION, REPORTED_RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION
 
 
 class FeedRepository:
@@ -12,14 +12,18 @@ class FeedRepository:
     def get_feed(user_id, category, page=1, per_page=10) -> Union[Response, dict]:
         try:
             user_id = ObjectId(user_id)
-            pipeline = []
-            if category and category != 0:
-                pipeline.append({
+            recipes = mongo.db[RECIPES_COLLECTION].aggregate(pipeline=[
+                {
                     '$match': {
-                        'category': category
+                        '$expr': {
+                            '$and': [
+                                {'$eq': ['$category', category]
+                                 } if category and category != 0 else {},
+                                {'$not': {'$in': [user_id, '$reported_users']}}
+                            ]
+                        }
                     }
-                })
-            pipeline.extend([
+                },
                 {
                     '$sort': {
                         'created_at': pymongo.DESCENDING
@@ -157,20 +161,20 @@ class FeedRepository:
                         ]
                     }
                 },
-                {
-                    '$addFields': {
-                        'my_ingredients': {
-                            '$getField': {
-                                'field': 'ingredients',
-                                'input': {
-                                    '$arrayElemAt': [
-                                    '$my_ingredients', 0
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                },
+                # {
+                #     '$addFields': {
+                #         'my_ingredients': {
+                #             '$getField': {
+                #                 'field': 'ingredients',
+                #                 'input': {
+                #                     '$arrayElemAt': [
+                #                     '$my_ingredients', 0
+                #                     ]
+                #                 }
+                #             }
+                #         }
+                #     }
+                # },
                 {
                     '$project': {
                         'posts': 0,
@@ -181,7 +185,6 @@ class FeedRepository:
                         'user.firebase_token': 0
                     }
                 }])
-            recipes = mongo.db[RECIPES_COLLECTION].aggregate(pipeline=pipeline)
             return recipes
         except Exception as e:
             print(e)

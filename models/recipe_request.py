@@ -7,6 +7,7 @@ class RecipeRequest(BaseModel):
     category: int
     likes: list = []
     favorites: list = []
+    reported_users: list = []
     ingredients: str
     likes_count: int = 0
     comments_count: int = 0
