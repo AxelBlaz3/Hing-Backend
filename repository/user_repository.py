@@ -652,6 +652,8 @@ class UserRepository:
             return recipes
         except:
             return []
+    
+    # follow  user
 
     # follow  user
 
@@ -896,3 +898,5 @@ class UserRepository:
             return Response(status=True, msg='Ingredients updated', status_code=200)
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
+
+   
