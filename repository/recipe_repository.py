@@ -1,17 +1,20 @@
+from flask.typing import StatusCode
 from flask_pymongo import PyMongo
 import pymongo
 from pymongo.command_cursor import CommandCursor
+from pymongo.message import update
 from werkzeug.exceptions import NotFound
 from models.like_request import LikeRequest
 from pymongo.collection import ReturnDocument
 from pymongo.results import InsertOneResult
+from models.report_recipe_request import ReportRecipeRequest
 from models.response import Response
 from typing import List
 from repository import uploads, mongo
-from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
+from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, REPORTED_RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
 from extensions import MediaType, NotificationType
-from flask import json
-from bson import ObjectId
+from flask import json, request
+from bson import ObjectId, json_util
 from datetime import datetime
 from common.firebase_utils import FirebaseUtils
 
@@ -30,8 +33,8 @@ class RecipeRepository:
 
             recipe_dict = recipe_request.dict()
             recipe_dict['created_at'] = datetime.utcnow()
-            insert_result: InsertOneResult = mongo.db[RECIPES_COLLECTION].insert_one(recipe_dict
-                                                                                     )
+            insert_result: InsertOneResult = mongo.db[RECIPES_COLLECTION].insert_one(
+                recipe_dict)
 
             # Upload media
             media: List[str] = []
@@ -521,3 +524,22 @@ class RecipeRepository:
             return recipes
         except:
             return []
+
+    # report recipe
+    @staticmethod
+    def report_recipe(report_recipe_request: ReportRecipeRequest):
+        try:
+            report_data_dict = report_recipe_request.dict()
+
+            report_recipe_request['user_id'] = ObjectId(
+                report_recipe_request['user_id'])
+            report_recipe_request['recipe_id'] = ObjectId(
+                report_recipe_request['recipe_id'])
+
+            mongo.db[REPORTED_RECIPES_COLLECTION].insert_one(
+                document=report_data_dict)
+
+            return Response(status=True, msg='Recipe reported successfully!', status_code=200)
+        except Exception as e:
+            print(e)
+            return Response(status=False, msg='Something went wrong', status_code=400)

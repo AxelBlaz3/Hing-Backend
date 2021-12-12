@@ -1,11 +1,12 @@
+from enum import unique
 import os
 from random import Random, random
 from flask_mail import Message
 from pymongo.collection import ReturnDocument
-
 from pymongo.message import update
 from pymongo.results import UpdateResult
 from werkzeug.datastructures import FileStorage
+from models.change_password import ChangePasswordRequest
 from models.create_password_request import CreatePasswordRequest
 from models.my_ingredients_update import MyIngredientsUpdateRequest
 from repository.uploads import upload_file
@@ -29,6 +30,7 @@ from common.firebase_utils import FirebaseUtils
 
 
 class UserRepository:
+#login user
     @classmethod
     def login(*args) -> Union[dict, Response]:
         _, login_request = args
@@ -97,6 +99,7 @@ class UserRepository:
         except Exception:
             return Response(status_code=400, msg='Some error occured', status=False)
 
+    #sign up user
     @staticmethod
     def signup(signup_request) -> Union[dict, Response]:
         mongo.db[USERS_COLLECTION].create_index('email', unique=True)
@@ -118,6 +121,8 @@ class UserRepository:
             print(e)
             return Response(status_code=400, msg='Some error occured', status=False)
 
+    
+    #send verification code
     @staticmethod
     def send_verification_code(email: str) -> Response:
         try:
@@ -146,6 +151,7 @@ class UserRepository:
             print(f'{type(e)}: {e}')
             return Response(status_code=400, msg='Some error occured', status=False)
 
+    #create new password
     @staticmethod
     def create_new_password(create_password_request: CreatePasswordRequest):
         try:
@@ -172,6 +178,30 @@ class UserRepository:
         except:
             return Response(status_code=400, msg='Something went wrong', status=False)
 
+    
+    #change password
+    @staticmethod
+    def change_password(password_change:ChangePasswordRequest):
+        try:
+            filter={'user_id':password_change.user_id}
+            user_password=mongo.db[USERS_COLLECTION].find_one_or_404(filter=filter)
+
+            update_result:UpdateResult=mongo.db[USERS_COLLECTION].update_one(filter=filter,update={'$set':{'password':bcrypt.generate_password_hash(password=password_change.password)}}
+            )
+
+            if update_result.modified_count>0:
+                return Response(status_code=200,msg='Password Changed',status=True)
+            
+            return Response(status_code=400,msg='Something went wrong',status=False)
+
+        except NotFound:
+            return Response(status_code=404, msg='Could not change password',status=False)
+        except:
+            return Response(status_code=400,msg='Some Error Occured',status=False)
+
+
+
+    # get followers
     @staticmethod
     def get_followers(user_id, other_user_id, page=1, per_page=10) -> Union[CommandCursor, Response]:
         try:
@@ -243,6 +273,8 @@ class UserRepository:
             print(e)
             return []
 
+    #get following list
+
     @staticmethod
     def get_following(user_id, other_user_id, page=1, per_page=10) -> Union[CommandCursor, Response]:
         try:
@@ -310,6 +342,8 @@ class UserRepository:
         except Exception as e:
             print(e)
             return []
+
+    #get user related post
 
     @staticmethod
     def get_posts(user_id, other_user_id, page=1, per_page=10):
@@ -464,6 +498,8 @@ class UserRepository:
             print(e)
             return []
 
+    # get favorites
+
     @staticmethod
     def get_favorites(user_id, page=1, per_page=10):
         try:
@@ -610,6 +646,8 @@ class UserRepository:
             return recipes
         except:
             return []
+    
+    # follow  user
 
     @staticmethod
     def follow_user(follow_request: FollowRequest):
@@ -653,6 +691,8 @@ class UserRepository:
 
         return Response(status=False, msg='Something went wrong', status_code=400)
 
+    #unfollow user
+
     @staticmethod
     def unfollow_user(follow_request: FollowRequest):
         try:
@@ -669,6 +709,8 @@ class UserRepository:
             pass
 
         return Response(status=False, msg='Something went wrong', status_code=400)
+
+    #get notifications
 
     @staticmethod
     def get_notifications(user_id: str, page: int = 1, per_page: int = 10):
@@ -770,6 +812,8 @@ class UserRepository:
         except Exception as e:
             print(e)
 
+    # update user
+
     @staticmethod
     def update_user(edit_profile_request: EditProfileRequest, image: FileStorage = None):
         try:
@@ -806,6 +850,8 @@ class UserRepository:
             print(e)
             return Response(status=False, msg='Something went wrong', status_code=400)
 
+    # update firebase token
+
     @staticmethod
     def update_firebase_token(payload):
         try:
@@ -825,6 +871,8 @@ class UserRepository:
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
 
+    #update  user ingredients
+
     @staticmethod
     def update_user_ingredients(my_ingredients_update_request: MyIngredientsUpdateRequest):
         try:
@@ -842,3 +890,5 @@ class UserRepository:
             return Response(status=True, msg='Ingredients updated', status_code=200)
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
+
+   
