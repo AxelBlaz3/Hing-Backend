@@ -181,17 +181,19 @@ class UserRepository:
     # change password
 
     @staticmethod
-    def change_password(password_change: ChangePasswordRequest):
+    def change_password(change_password_request: ChangePasswordRequest):
         try:
-            filter = {'user_id': password_change.user_id}
-            user_password = mongo.db[USERS_COLLECTION].find_one_or_404(
-                filter=filter)
+            if change_password_request.new_password == change_password_request.old_password:
+                return Response(status_code=400, msg='New password cannot be same as old password.', status=False)
 
-            update_result: UpdateResult = mongo.db[USERS_COLLECTION].update_one(filter=filter, update={'$set': {'password': bcrypt.generate_password_hash(password=password_change.password)}}
-                                                                                )
+            filter = {'_id': ObjectId(change_password_request.user_id)}
 
-            if update_result.modified_count > 0:
-                return Response(status_code=200, msg='Password Changed', status=True)
+            user = mongo.db[USERS_COLLECTION].find_one_or_404(filter, {'password': 1})
+            if bcrypt.check_password_hash(user['password'], change_password_request.old_password):
+                update_result: UpdateResult = mongo.db[USERS_COLLECTION].update_one(filter=filter, update={'$set': {'password': bcrypt.generate_password_hash(password=change_password_request.new_password)}}                                                        )
+
+                if update_result.modified_count > 0:
+                    return Response(status_code=200, msg='Password Changed', status=True)
 
             return Response(status_code=400, msg='Something went wrong', status=False)
 
@@ -652,7 +654,7 @@ class UserRepository:
             return recipes
         except:
             return []
-    
+
     # follow  user
 
     # follow  user
@@ -898,5 +900,3 @@ class UserRepository:
             return Response(status=True, msg='Ingredients updated', status_code=200)
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
-
-   
