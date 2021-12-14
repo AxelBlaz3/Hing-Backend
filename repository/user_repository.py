@@ -195,7 +195,7 @@ class UserRepository:
                 if update_result.modified_count > 0:
                     return Response(status_code=200, msg='Password Changed', status=True)
 
-            return Response(status_code=400, msg='Something went wrong', status=False)
+            return Response(status_code=400, msg='Incorrect old password.', status=False)
 
         except NotFound:
             return Response(status_code=404, msg='Could not change password', status=False)
