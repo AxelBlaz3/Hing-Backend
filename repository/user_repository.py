@@ -6,6 +6,7 @@ from pymongo.collection import ReturnDocument
 from pymongo.message import update
 from pymongo.results import UpdateResult
 from werkzeug.datastructures import FileStorage
+from models.block_request import BlockRequest
 from models.change_password import ChangePasswordRequest
 from models.create_password_request import CreatePasswordRequest
 from models.my_ingredients_update import MyIngredientsUpdateRequest
@@ -900,3 +901,93 @@ class UserRepository:
             return Response(status=True, msg='Ingredients updated', status_code=200)
         except:
             return Response(status=False, msg='Something went wrong', status_code=400)
+
+
+    @staticmethod
+    def block_user(block_request: BlockRequest):
+        try:
+            user_id = ObjectId(block_request.user_id)
+            other_user_id = ObjectId(block_request.other_user_id)
+
+            mongo.db[USERS_COLLECTION].update_one(filter={'_id': user_id}, update={
+                                                  '$addToSet': {'blocked': other_user_id}}, upsert=True)
+
+            # Remove following and followers status for both the users.
+            UserRepository.unfollow_user(follow_request=FollowRequest(followee_id=block_request.user_id, follower_id=block_request.other_user_id))
+
+            return Response(status=True, msg='Block list updated', status_code=200)
+        except:
+            pass
+
+        return Response(status=False, msg='Something went wrong', status_code=400)        
+
+
+    @staticmethod
+    def unblock_user(block_request: BlockRequest):
+        try:
+            user_id = ObjectId(block_request.user_id)
+            other_user_id = ObjectId(block_request.other_user_id)
+
+            mongo.db[USERS_COLLECTION].update_one(filter={'_id': user_id}, update={
+                                                  '$pull': {'blocked': other_user_id}}, upsert=True)
+
+            return Response(status=True, msg='Block list updated', status_code=200)
+        except:
+            pass
+
+        return Response(status=False, msg='Something went wrong', status_code=400)  
+
+
+    @staticmethod
+    def get_blocked_list(user_id, page=1, per_page=10) -> Union[CommandCursor, Response]:
+        try:
+            if user_id is None:
+                return Response(status=True, status_code=400, msg='Invalid user id')
+
+            user_id = ObjectId(user_id)
+
+            blocked_list: CommandCursor = mongo.db[USERS_COLLECTION].aggregate([
+                {
+                    '$match': {
+                        '_id': user_id
+                    }
+                }, {
+                    '$project': {
+                        'blocked': 1
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'users',
+                        'as': 'users',
+                        'let': {
+                            'blocked': '$blocked'
+                        },
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$in': [
+                                            '$_id', '$$blocked'
+                                        ]
+                                    }
+                                }
+                            }, {
+                                '$project': {
+                                    '_id': 1,
+                                    'display_name': 1,
+                                    'image': 1
+                                }
+                            }
+                        ]
+                    }
+                }, {
+                    '$project': {
+                        'blocked': 0,
+                        '_id': 0,
+                    }
+                }
+            ])
+            return blocked_list.next()['users']
+        except Exception as e:
+            print(e)
+            return []

@@ -1,3 +1,4 @@
+from models.block_request import BlockRequest
 from models.change_password import ChangePasswordRequest
 from models.create_password_request import CreatePasswordRequest
 from models.edit_profile_request import EditProfileRequest
@@ -10,7 +11,7 @@ from flask import json
 from bson import json_util
 from flask.json import jsonify
 from routes import user_api
-from constants import CHANGE_PASSWORD_ENDPOINT, CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT, UPDATE_MY_INGREDIENTS_ENDPOINT
+from constants import BLOCK_USER_ENDPOINT, BLOCKLIST_USER_ENDPOINT, CHANGE_PASSWORD_ENDPOINT, CREATE_NEW_PASSWORD_ENDPOINT, EDIT_PROFILE_ENDPOINT, FOLLOW_USER_ENDPOINT, GET_FOLLOWERS_ENDPOINT, GET_FOLLOWING_ENDPOINT, GET_NOTIFICATIONS_ENDPOINT, GET_USER_FAVORITES_ENDPOINT, GET_USER_POSTS_ENDPOINT, SEND_RESET_CODE_ENDPOINT, SIGNUP_ENDPOINT, LOGIN_ENDPOINT, UNBLOCK_USER_ENDPOINT, UNFOLLOW_USER_ENDPOINT, UPDATE_FIREBASE_TOKEN_ENDPOINT, UPDATE_MY_INGREDIENTS_ENDPOINT
 from models.signup_request import SignupRequest
 from models.login_request import LoginRequest
 from pydantic.error_wrappers import ValidationError
@@ -237,5 +238,40 @@ def update_my_ingredients():
 
     result = UserRepository.update_user_ingredients(
         my_ingredients_update_request=my_ingredients_update_request)
+
+    return result.dict(), result.status_code
+
+
+@user_api.get(BLOCKLIST_USER_ENDPOINT)
+def get_blocked_list(user_id: str):
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=10, type=int)
+    
+    result = UserRepository.get_blocked_list(user_id=user_id, page=page, per_page=per_page)
+    return result.dict(), result.status_code
+
+
+@user_api.put(BLOCK_USER_ENDPOINT)
+@validate()
+def block_user():
+    try:
+        block_request = BlockRequest(**request.json)
+    except ValidationError as e:
+        return e.json(), 400
+
+    result = UserRepository.block_user(block_request=block_request)
+
+    return result.dict(), result.status_code
+
+
+@user_api.put(UNBLOCK_USER_ENDPOINT)
+@validate()
+def unblock_user():
+    try:
+        block_request = BlockRequest(**request.json)
+    except ValidationError as e:
+        return e.json(), 400
+
+    result = UserRepository.unblock_user(block_request=block_request)
 
     return result.dict(), result.status_code

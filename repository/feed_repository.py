@@ -3,7 +3,7 @@ import pymongo
 from models.response import Response
 from typing import Union
 from repository import mongo
-from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION, REPORTED_RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION
+from constants import COMMENTS_COLLECTION, RECIPES_COLLECTION, REPORTED_RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
 
 
 class FeedRepository:
@@ -14,14 +14,53 @@ class FeedRepository:
             user_id = ObjectId(user_id)
             recipes = mongo.db[RECIPES_COLLECTION].aggregate(pipeline=[
                 {
+                    '$lookup': {
+                        'from': USERS_COLLECTION,
+                        'as': 'blocked_users',
+                        'let': {'user_id': '$user_id'},
+                        'pipeline': [
+                            {
+                                '$match': {
+                                    '$expr': {
+                                        '$eq': ['$_id', user_id]
+                                    }
+                                }
+                            },
+                            {
+                                '$project': {
+                                    'blocked': 1
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    '$addFields': {
+                        'blocked_users': {'$arrayElemAt': ['$blocked_users', 0]}
+                    }
+                },
+                {
+                    '$addFields': {
+                        'blocked_users': {
+                            '$ifNull': ['$$ROOT.blocked_users.blocked', []]
+                        }
+                    }
+                },
+                {
                     '$match': {
                         '$expr': {
                             '$and': [
                                 {'$eq': ['$category', category]
                                  } if category and category != 0 else {},
-                                {'$not': {'$in': [user_id, '$reported_users']}}
+                                {'$not': {'$in': [user_id, '$reported_users']}},
+                                {'$not': {'$in': ['$user_id', '$blocked_users']}}
                             ]
                         }
+                    }
+                },
+                {
+                    '$project': {
+                        'blocked_users': 0
                     }
                 },
                 {
