@@ -1,5 +1,3 @@
-from flask.typing import StatusCode
-from flask_pymongo import PyMongo
 import pymongo
 from pymongo.command_cursor import CommandCursor
 from pymongo.message import update
@@ -13,8 +11,8 @@ from typing import List
 from repository import uploads, mongo
 from constants import COMMENTS_COLLECTION, NOTIFICATIONS_COLLECTION, RECIPES_COLLECTION, MEDIA_COLLECTION, REPORTED_RECIPES_COLLECTION, USER_INGREDIENTS_COLLECTION, USERS_COLLECTION
 from extensions import MediaType, NotificationType
-from flask import json, request
-from bson import ObjectId, json_util
+from flask import json
+from bson import ObjectId
 from datetime import datetime
 from common.firebase_utils import FirebaseUtils
 
@@ -389,7 +387,7 @@ class RecipeRepository:
                         '$expr': {
                             '$and': [
                                 {
-                                '$regexMatch': {'input': '$title', 'regex': f'{query}.*', 'options': 'i'}},
+                                    '$regexMatch': {'input': '$title', 'regex': f'{query}.*', 'options': 'i'}},
                                 {'$not': {'$in': [user_id, '$reported_users']}}
                             ]
                         }
@@ -549,6 +547,5 @@ class RecipeRepository:
                 document=report_data_dict)
 
             return Response(status=True, msg='Recipe reported successfully!', status_code=200)
-        except Exception as e:
-            print(e)
+        except:
             return Response(status=False, msg='Something went wrong', status_code=400)

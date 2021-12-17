@@ -144,7 +144,7 @@ def report_recipe():
         result = RecipeRepository.report_recipe(
             report_recipe_request=report_recipe_request)
 
-        return result.to_dict, result.status_code
+        return result.dict(), result.status_code
     except ValidationError as e:
         print(e)
         return e.json(), 400
